@@ -6,7 +6,13 @@ import sys
 
 POST_COMMIT_SCRIPT = """#!/bin/sh
 # AI Model Observer post-commit hook
-python -m hooks.git_tracker
+if [ -f ".venv/Scripts/python.exe" ]; then
+    .venv/Scripts/python.exe -m hooks.git_tracker
+elif command -v py >/dev/null 2>&1; then
+    py -m hooks.git_tracker
+else
+    python -m hooks.git_tracker
+fi
 """
 
 def install_hook():
