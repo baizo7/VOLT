@@ -28,7 +28,7 @@ from typing import Any, List, Optional
 import asyncpg
 import httpx
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response, StreamingResponse
 from pydantic import BaseModel
 
 # Modular component imports
@@ -787,6 +787,15 @@ async def health_view():
     if not await check_health(pool):
         return JSONResponse({"ok": False, "status": "unready", "error": "database unreachable"}, status_code=503)
     return {"ok": True, "status": "ready"}
+
+
+@app.get("/download/observer.whl")
+async def download_cli_wheel():
+    """Serve the compiled observer CLI package wheel for client installation."""
+    whl_path = os.path.join(os.path.dirname(__file__), "dist", "ai_observer-1.0.0-py3-none-any.whl")
+    if os.path.exists(whl_path):
+        return FileResponse(whl_path, filename="ai_observer-1.0.0-py3-none-any.whl", media_type="application/zip")
+    return JSONResponse({"error": "wheel package not found"}, status_code=404)
 
 
 # ---------- models listing compatibility ----------
