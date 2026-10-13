@@ -224,7 +224,11 @@ def cmd_test(args: argparse.Namespace) -> int:
     """Send a minimal test request to verify end-to-end proxy connectivity."""
     cfg = load_config()
     server = (args.server or get_server_url(cfg)).rstrip("/")
-    key = args.key or cfg.get("api_key") or os.environ.get("OPENAI_API_KEY") or "test-key"
+    key = args.key or cfg.get("api_key") or os.environ.get("OPENAI_API_KEY")
+    if not key:
+        print("[!] Note: No personal API key found in ~/.ai-observer/config.json.")
+        print("    If BYOK is enabled on the server, please set your Gemini key via 'observer activate', or pass --key <KEY>.")
+        key = "test-key"
     user = args.user or cfg.get("user") or "cli-tester"
     project = args.project or cfg.get("project") or "test-project"
     model = args.model or "gemini-3.1-flash-lite-preview"
@@ -246,7 +250,7 @@ def cmd_test(args: argparse.Namespace) -> int:
 
     try:
         req = urllib.request.Request(f"{server}/v1/chat/completions", data=data, headers=headers, method="POST")
-        with urllib.request.urlopen(req, timeout=15) as resp:
+        with urllib.request.urlopen(req, timeout=60) as resp:
             body = json.loads(resp.read().decode("utf-8"))
             content = body["choices"][0]["message"]["content"]
             usage = body.get("usage", {})
