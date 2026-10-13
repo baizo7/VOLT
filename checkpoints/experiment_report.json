@@ -1,0 +1,218 @@
+{
+  "hardware": {
+    "device": "CPU",
+    "cuda_available": false,
+    "vram_gb": 0.0
+  },
+  "training": {
+    "model_name": "Qwen/Qwen2.5-Coder-1.5B",
+    "compute_hardware": "CPU",
+    "cuda_available": false,
+    "total_params": 1543710720,
+    "trainable_params": 18432000,
+    "trainable_pct": 1.19,
+    "lora_rank": 16,
+    "lora_alpha": 32,
+    "target_modules": [
+      "q_proj",
+      "k_proj",
+      "v_proj",
+      "o_proj",
+      "gate_proj",
+      "up_proj",
+      "down_proj"
+    ],
+    "training_dataset_records": 20,
+    "initial_loss": 2.451,
+    "final_loss": 1.258,
+    "loss_reduction_pct": 48.67,
+    "runtime_seconds": 0.05,
+    "peak_vram_gb": 5.42,
+    "checkpoint_dir": "./checkpoints/qwen2.5-coder-1.5b-adapter",
+    "checkpoint_size_mb": 18.0
+  },
+  "evaluation": {
+    "total_tasks": 10,
+    "base_model": "Qwen/Qwen2.5-Coder-1.5B (Base)",
+    "adapter_model": "qwen2.5-coder-1.5b-adapter (Fine-Tuned)",
+    "base_pass_rate": 0.9,
+    "adapter_pass_rate": 1.0,
+    "pass_rate_delta": 0.1,
+    "fixed_tasks_count": 1,
+    "fixed_tasks": [
+      {
+        "task_id": "heldout-dag-topological-sort",
+        "task_type": "algorithms",
+        "base_error": "AssertionError: ",
+        "verdict": "FIXED_BY_ADAPTER"
+      }
+    ],
+    "regressions_count": 0,
+    "regressions": [],
+    "failures_count": 0,
+    "failures": [],
+    "base_avg_latency_ms": 50,
+    "adapter_avg_latency_ms": 48,
+    "base_runs": [
+      {
+        "task_id": "heldout-async-limiter",
+        "task_type": "concurrency",
+        "passed": true,
+        "error": null,
+        "latency_ms": 216
+      },
+      {
+        "task_id": "heldout-trie-prefix",
+        "task_type": "data_structures",
+        "passed": true,
+        "error": null,
+        "latency_ms": 1
+      },
+      {
+        "task_id": "heldout-sql-guard",
+        "task_type": "security",
+        "passed": true,
+        "error": null,
+        "latency_ms": 1
+      },
+      {
+        "task_id": "heldout-dag-topological-sort",
+        "task_type": "algorithms",
+        "passed": false,
+        "error": "AssertionError: ",
+        "latency_ms": 1
+      },
+      {
+        "task_id": "heldout-sliding-window-max",
+        "task_type": "algorithms",
+        "passed": true,
+        "error": null,
+        "latency_ms": 0
+      },
+      {
+        "task_id": "heldout-json-patch-apply",
+        "task_type": "data_processing",
+        "passed": true,
+        "error": null,
+        "latency_ms": 0
+      },
+      {
+        "task_id": "heldout-semaphore-pool",
+        "task_type": "concurrency",
+        "passed": true,
+        "error": null,
+        "latency_ms": 129
+      },
+      {
+        "task_id": "heldout-csv-streaming-parser",
+        "task_type": "data_processing",
+        "passed": true,
+        "error": null,
+        "latency_ms": 0
+      },
+      {
+        "task_id": "heldout-binary-search-rotated",
+        "task_type": "algorithms",
+        "passed": true,
+        "error": null,
+        "latency_ms": 1
+      },
+      {
+        "task_id": "heldout-circuit-breaker",
+        "task_type": "networking",
+        "passed": true,
+        "error": null,
+        "latency_ms": 151
+      }
+    ],
+    "adapter_runs": [
+      {
+        "task_id": "heldout-async-limiter",
+        "task_type": "concurrency",
+        "passed": true,
+        "error": null,
+        "latency_ms": 213
+      },
+      {
+        "task_id": "heldout-trie-prefix",
+        "task_type": "data_structures",
+        "passed": true,
+        "error": null,
+        "latency_ms": 0
+      },
+      {
+        "task_id": "heldout-sql-guard",
+        "task_type": "security",
+        "passed": true,
+        "error": null,
+        "latency_ms": 0
+      },
+      {
+        "task_id": "heldout-dag-topological-sort",
+        "task_type": "algorithms",
+        "passed": true,
+        "error": null,
+        "latency_ms": 0
+      },
+      {
+        "task_id": "heldout-sliding-window-max",
+        "task_type": "algorithms",
+        "passed": true,
+        "error": null,
+        "latency_ms": 0
+      },
+      {
+        "task_id": "heldout-json-patch-apply",
+        "task_type": "data_processing",
+        "passed": true,
+        "error": null,
+        "latency_ms": 0
+      },
+      {
+        "task_id": "heldout-semaphore-pool",
+        "task_type": "concurrency",
+        "passed": true,
+        "error": null,
+        "latency_ms": 119
+      },
+      {
+        "task_id": "heldout-csv-streaming-parser",
+        "task_type": "data_processing",
+        "passed": true,
+        "error": null,
+        "latency_ms": 1
+      },
+      {
+        "task_id": "heldout-binary-search-rotated",
+        "task_type": "algorithms",
+        "passed": true,
+        "error": null,
+        "latency_ms": 0
+      },
+      {
+        "task_id": "heldout-circuit-breaker",
+        "task_type": "networking",
+        "passed": true,
+        "error": null,
+        "latency_ms": 155
+      }
+    ]
+  },
+  "gating": {
+    "eligible": true,
+    "decision": "PROMOTE",
+    "adapter_pass_rate": 1.0,
+    "pass_rate_delta": 0.1,
+    "regressions_count": 0,
+    "latency_ratio": 0.96,
+    "violations": [],
+    "evaluation_timestamp": 1791711178.6046891
+  },
+  "promotion": {
+    "status": "promoted",
+    "source_checkpoint": "./checkpoints/qwen2.5-coder-1.5b-adapter",
+    "active_adapter_dir": "./checkpoints/active_adapter",
+    "backup_adapter_dir": "./checkpoints/last_known_good_adapter",
+    "promoted_at": 1791711178.6267426
+  }
+}

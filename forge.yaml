@@ -1,0 +1,35 @@
+
+version: '2.0'
+defaults:
+  adapter: opencode
+  model: null
+  effort: medium
+  timeout: 300
+  auto_approve: true
+
+stages:
+  critic:
+    effort: high
+    timeout: 900
+  architect:
+    effort: high
+  planner:
+    effort: high
+  executor:
+    adapter: antigravity
+    model: gemini-3.7-flash-high
+    effort: high
+    timeout: 1200
+    auto_approve: true
+    extra_flags:
+      sandbox: true
+  tester:
+    effort: high
+  reviewer:
+    effort: high
+
+execution:
+  mode: interactive
+  auto_commit: false
+  default_timeout: 300
+

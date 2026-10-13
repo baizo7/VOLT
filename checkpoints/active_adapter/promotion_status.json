@@ -1,0 +1,7 @@
+{
+  "status": "promoted",
+  "source_checkpoint": "./checkpoints/qwen2.5-coder-1.5b-adapter",
+  "active_adapter_dir": "./checkpoints/active_adapter",
+  "backup_adapter_dir": "./checkpoints/last_known_good_adapter",
+  "promoted_at": 1791711178.6267426
+}

@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "pid": 4347,
+  "run_id": "run-002",
+  "stage_name": "executor",
+  "iteration": 1,
+  "adapter": "antigravity",
+  "session_id": "37a2d9a0-cde7-41e6-ab94-86fb0edcfe6c",
+  "acquired_at": "2026-10-11T06:12:49.982959+00:00",
+  "status": "RELEASED",
+  "released_at": "2026-10-11T06:13:43.466507+00:00"
+}

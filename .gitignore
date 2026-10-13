@@ -1,0 +1,18 @@
+.forge/runs/
+.forge/cache/
+
+.env
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Backups and temporary recovery artifacts
+*.backup*
+*.bak*
+*-backup*
+*-backup-*
+*recovery*
+forge.yaml.*
+observer-stats-before.json
+opencode.json.observer-test-disabled

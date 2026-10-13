@@ -1,0 +1,288 @@
+{
+  "sft": {
+    "total_records": 20,
+    "all_valid": true,
+    "validations": [
+      {
+        "record_index": 1,
+        "task_id": "task-tree-serializer-codec",
+        "valid": true,
+        "errors": []
+      },
+      {
+        "record_index": 2,
+        "task_id": "task-tree-serializer-codec",
+        "valid": true,
+        "errors": []
+      },
+      {
+        "record_index": 3,
+        "task_id": "task-bounded-async-queue",
+        "valid": true,
+        "errors": []
+      },
+      {
+        "record_index": 4,
+        "task_id": "task-bounded-async-queue",
+        "valid": true,
+        "errors": []
+      },
+      {
+        "record_index": 5,
+        "task_id": "task-jwt-claims-extractor",
+        "valid": true,
+        "errors": []
+      },
+      {
+        "record_index": 6,
+        "task_id": "task-jwt-claims-extractor",
+        "valid": true,
+        "errors": []
+      },
+      {
+        "record_index": 7,
+        "task_id": "task-metrics-percentiles",
+        "valid": true,
+        "errors": []
+      },
+      {
+        "record_index": 8,
+        "task_id": "task-metrics-percentiles",
+        "valid": true,
+        "errors": []
+      },
+      {
+        "record_index": 9,
+        "task_id": "task-data-cleaner-stream",
+        "valid": true,
+        "errors": []
+      },
+      {
+        "record_index": 10,
+        "task_id": "task-data-cleaner-stream",
+        "valid": true,
+        "errors": []
+      },
+      {
+        "record_index": 11,
+        "task_id": "task-regex-token-scrubber",
+        "valid": true,
+        "errors": []
+      },
+      {
+        "record_index": 12,
+        "task_id": "task-regex-token-scrubber",
+        "valid": true,
+        "errors": []
+      },
+      {
+        "record_index": 13,
+        "task_id": "task-lru-cache-impl",
+        "valid": true,
+        "errors": []
+      },
+      {
+        "record_index": 14,
+        "task_id": "task-lru-cache-impl",
+        "valid": true,
+        "errors": []
+      },
+      {
+        "record_index": 15,
+        "task_id": "task-sql-safe-query",
+        "valid": true,
+        "errors": []
+      },
+      {
+        "record_index": 16,
+        "task_id": "task-sql-safe-query",
+        "valid": true,
+        "errors": []
+      },
+      {
+        "record_index": 17,
+        "task_id": "task-api-retry-handler",
+        "valid": true,
+        "errors": []
+      },
+      {
+        "record_index": 18,
+        "task_id": "task-api-retry-handler",
+        "valid": true,
+        "errors": []
+      },
+      {
+        "record_index": 19,
+        "task_id": "task-algo-memo-fib",
+        "valid": true,
+        "errors": []
+      },
+      {
+        "record_index": 20,
+        "task_id": "task-algo-memo-fib",
+        "valid": true,
+        "errors": []
+      }
+    ]
+  },
+  "dpo": {
+    "total_pairs": 10,
+    "all_valid": true,
+    "validations": [
+      {
+        "pair_index": 1,
+        "task_id": "task-tree-serializer-codec",
+        "valid": true,
+        "prompt_length": 139,
+        "chosen_length": 564,
+        "rejected_length": 64,
+        "errors": []
+      },
+      {
+        "pair_index": 2,
+        "task_id": "task-bounded-async-queue",
+        "valid": true,
+        "prompt_length": 129,
+        "chosen_length": 413,
+        "rejected_length": 161,
+        "errors": []
+      },
+      {
+        "pair_index": 3,
+        "task_id": "task-jwt-claims-extractor",
+        "valid": true,
+        "prompt_length": 144,
+        "chosen_length": 399,
+        "rejected_length": 124,
+        "errors": []
+      },
+      {
+        "pair_index": 4,
+        "task_id": "task-metrics-percentiles",
+        "valid": true,
+        "prompt_length": 130,
+        "chosen_length": 468,
+        "rejected_length": 121,
+        "errors": []
+      },
+      {
+        "pair_index": 5,
+        "task_id": "task-data-cleaner-stream",
+        "valid": true,
+        "prompt_length": 149,
+        "chosen_length": 367,
+        "rejected_length": 107,
+        "errors": []
+      },
+      {
+        "pair_index": 6,
+        "task_id": "task-regex-token-scrubber",
+        "valid": true,
+        "prompt_length": 138,
+        "chosen_length": 154,
+        "rejected_length": 103,
+        "errors": []
+      },
+      {
+        "pair_index": 7,
+        "task_id": "task-lru-cache-impl",
+        "valid": true,
+        "prompt_length": 105,
+        "chosen_length": 670,
+        "rejected_length": 193,
+        "errors": []
+      },
+      {
+        "pair_index": 8,
+        "task_id": "task-sql-safe-query",
+        "valid": true,
+        "prompt_length": 137,
+        "chosen_length": 235,
+        "rejected_length": 151,
+        "errors": []
+      },
+      {
+        "pair_index": 9,
+        "task_id": "task-api-retry-handler",
+        "valid": true,
+        "prompt_length": 143,
+        "chosen_length": 461,
+        "rejected_length": 105,
+        "errors": []
+      },
+      {
+        "pair_index": 10,
+        "task_id": "task-algo-memo-fib",
+        "valid": true,
+        "prompt_length": 157,
+        "chosen_length": 241,
+        "rejected_length": 97,
+        "errors": []
+      }
+    ]
+  },
+  "data_quality": {
+    "unredacted_secrets": 0,
+    "duplicates": 10,
+    "train_count": 16,
+    "val_count": 4,
+    "leakage_overlap": 0
+  },
+  "training": {
+    "compute_device": "CPU",
+    "base_architecture": "GPT2 (128-dim, 2 layers, 2 heads)",
+    "total_params": 565760,
+    "trainable_params": 8192,
+    "trainable_pct": 1.45,
+    "lora_rank": 8,
+    "lora_alpha": 16,
+    "training_steps": 12,
+    "initial_loss": 6.8884,
+    "final_loss": 6.9821,
+    "runtime_seconds": 0.142,
+    "memory_delta_mb": 16.7,
+    "saved_files": [
+      "adapter_config.json",
+      "adapter_model.safetensors",
+      "README.md"
+    ]
+  },
+  "evaluation": {
+    "base_model": "base_model",
+    "finetuned_model": "adapter_model",
+    "base_pass_rate": 0.5,
+    "finetuned_pass_rate": 1.0,
+    "pass_rate_delta": 0.5,
+    "latency_delta_ms": -5,
+    "wins": 2,
+    "losses": 0,
+    "ties": 2,
+    "is_improved": true,
+    "task_comparisons": [
+      {
+        "task_id": "bench-algo-fib",
+        "base_passed": true,
+        "finetuned_passed": true,
+        "verdict": "TIE"
+      },
+      {
+        "task_id": "bench-algo-parens",
+        "base_passed": true,
+        "finetuned_passed": true,
+        "verdict": "TIE"
+      },
+      {
+        "task_id": "bench-ds-lru",
+        "base_passed": false,
+        "finetuned_passed": true,
+        "verdict": "WIN (Fixed failure)"
+      },
+      {
+        "task_id": "bench-str-phone",
+        "base_passed": false,
+        "finetuned_passed": true,
+        "verdict": "WIN (Fixed failure)"
+      }
+    ]
+  }
+}
