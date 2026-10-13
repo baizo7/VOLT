@@ -1,6 +1,3 @@
-.forge/runs/
-.forge/cache/
-
 .env
 .venv/
 __pycache__/
@@ -13,7 +10,6 @@ __pycache__/
 *-backup*
 *-backup-*
 *recovery*
-forge.yaml.*
 observer-stats-before.json
 opencode.json.observer-test-disabled
 *.egg-info/
