@@ -733,7 +733,7 @@ async def add_outcome(payload: OutcomeRequest, request: Request):
 
 
 @app.get("/stats")
-async def stats(request: Request):
+async def stats(request: Request, session_id: Optional[str] = None, project: Optional[str] = None):
     """Per-model summary with last-touch attribution and task-level success metric."""
     if not check_auth(request):
         return JSONResponse({"error": "unauthorized"}, status_code=401)
@@ -741,10 +741,15 @@ async def stats(request: Request):
         return JSONResponse({"error": "database uninitialized"}, status_code=503)
     async with pool.acquire() as c:
         rows = await c.fetch("""
-            WITH task_primary_model AS (
+            WITH filtered_calls AS (
+                SELECT * FROM llm_calls
+                WHERE ($1::text IS NULL OR session_id = $1)
+                  AND ($2::text IS NULL OR project = $2)
+            ),
+            task_primary_model AS (
                 -- Attribute each task outcome to the most recent model used in that task
                 SELECT DISTINCT ON (task_id) task_id, model
-                FROM llm_calls
+                FROM filtered_calls
                 WHERE task_id IS NOT NULL
                 ORDER BY task_id, ts DESC
             ),
@@ -754,6 +759,7 @@ async def stats(request: Request):
                     bool_or(status IN ('fail', 'rejected')) AS has_fail,
                     bool_or(status IN ('pass', 'accepted')) AS has_pass
                 FROM outcomes
+                WHERE task_id IN (SELECT DISTINCT task_id FROM filtered_calls WHERE task_id IS NOT NULL)
                 GROUP BY task_id
             )
             SELECT m.model, m.calls, m.avg_latency_ms, m.input_tokens, m.output_tokens,
@@ -761,7 +767,7 @@ async def stats(request: Request):
             FROM (
                 SELECT model, count(*) calls, round(avg(latency_ms)) avg_latency_ms,
                        sum(input_tokens) input_tokens, sum(output_tokens) output_tokens
-                FROM llm_calls
+                FROM filtered_calls
                 GROUP BY model
             ) m
             LEFT JOIN (
@@ -772,7 +778,7 @@ async def stats(request: Request):
                 JOIN task_outcome_summary tos ON tos.task_id = tpm.task_id
                 GROUP BY tpm.model
             ) o ON o.model = m.model
-            ORDER BY m.calls DESC""")
+            ORDER BY m.calls DESC""", session_id, project)
     return [dict(r) for r in rows]
 
 
