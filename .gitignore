@@ -16,3 +16,6 @@ __pycache__/
 forge.yaml.*
 observer-stats-before.json
 opencode.json.observer-test-disabled
+*.egg-info/
+dist/
+build/
