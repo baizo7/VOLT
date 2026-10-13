@@ -35,19 +35,30 @@ def save_config(cfg: Dict[str, Any]) -> None:
         json.dump(cfg, f, indent=2)
 
 
+def normalize_url(url: str) -> str:
+    """Ensure URL has scheme and trimmed trailing slashes."""
+    raw = (url or "").strip().rstrip("/")
+    if not raw or raw in ("hi", "test", "hello"):
+        return "http://127.0.0.1:8787"
+    if not raw.startswith("http://") and not raw.startswith("https://"):
+        return f"http://{raw}"
+    return raw
+
+
 def get_server_url(cfg: Dict[str, Any]) -> str:
     """Resolve active observer server base URL."""
-    return (
+    return normalize_url(
         os.environ.get("OBSERVER_SERVER_URL")
         or cfg.get("server_url")
         or "http://127.0.0.1:8787"
-    ).rstrip("/")
+    )
 
 
 def cmd_activate(args: argparse.Namespace) -> int:
     """Activate or reconfigure AI Observer on the developer's computer."""
     cfg = load_config()
-    server = (args.server or cfg.get("server_url") or "http://127.0.0.1:8787").rstrip("/")
+    raw_server = args.server or cfg.get("server_url")
+    server = normalize_url(raw_server if raw_server and "://" in raw_server else "http://127.0.0.1:8787")
     user = args.user or cfg.get("user") or os.environ.get("USERNAME") or os.environ.get("USER") or "dev"
     project = args.project or cfg.get("project") or "default-project"
     key = args.key or cfg.get("api_key")
@@ -56,7 +67,7 @@ def cmd_activate(args: argparse.Namespace) -> int:
         print("=== AI Observer Client Setup ===")
         input_server = input(f"Central Observer Server URL [{server}]: ").strip()
         if input_server:
-            server = input_server.rstrip("/")
+            server = normalize_url(input_server)
         input_user = input(f"Developer Name / Session ID [{user}]: ").strip()
         if input_user:
             user = input_user
