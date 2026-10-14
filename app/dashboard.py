@@ -1,598 +1,705 @@
 """
-Interactive analytics and role-based access control dashboard for AI Model Observer.
-Admin Mode: Full visibility into connected developers, masked API keys, team-wide model performance, and datasets.
-Developer Mode: Scoped view showing only personal API usage, configured models, and active tasks.
+AI Model Observer — Full-Featured Analytics Dashboard
+Role-based access control with Admin and Developer views.
+Features: Trace Inspector, Dataset Export, Time-Series Charts,
+IDE Setup Assistant, Cost Analytics, Model Comparison.
 """
 
 DASHBOARD_HTML = """<!DOCTYPE html>
-<html lang="en" class="h-full bg-slate-950 text-slate-100">
+<html lang="en" class="h-full bg-[#0a0e1a] text-slate-100">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AI Model Observer - Dashboard</title>
+  <title>AI Model Observer</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Inter:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Inter:wght@300;400;500;600;700;800&display=swap">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'], mono: ['JetBrains Mono', 'monospace'] },
+          colors: {
+            surface: { 950: '#0a0e1a', 900: '#0f1424', 800: '#161d30', 700: '#1e2740', 600: '#283350' },
+          }
+        }
+      }
+    }
+  </script>
   <style>
     body { font-family: 'Inter', sans-serif; }
-    code, pre { font-family: 'JetBrains Mono', monospace; }
-    [x-cloak] { display: none !important; }
+    code, pre, .mono { font-family: 'JetBrains Mono', monospace; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #283350; border-radius: 3px; }
+    .glass { background: rgba(15,20,36,0.7); backdrop-filter: blur(12px); }
+    .tab-active { background: linear-gradient(135deg, #4f46e5, #7c3aed); color: white; box-shadow: 0 4px 15px rgba(79,70,229,0.3); }
+    .tab-inactive { background: transparent; color: #94a3b8; }
+    .tab-inactive:hover { color: #e2e8f0; background: rgba(30,39,64,0.5); }
+    .card { background: #0f1424; border: 1px solid #1e2740; border-radius: 16px; }
+    .card-glow { box-shadow: 0 0 30px rgba(79,70,229,0.05); }
+    .slide-enter { animation: slideIn 0.25s ease-out; }
+    @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    .fade-in { animation: fadeIn 0.2s ease-out; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    .metric-gradient-1 { background: linear-gradient(135deg, rgba(79,70,229,0.12), rgba(124,58,237,0.06)); border-color: rgba(79,70,229,0.25); }
+    .metric-gradient-2 { background: linear-gradient(135deg, rgba(6,182,212,0.12), rgba(34,211,238,0.06)); border-color: rgba(6,182,212,0.25); }
+    .metric-gradient-3 { background: linear-gradient(135deg, rgba(16,185,129,0.12), rgba(52,211,153,0.06)); border-color: rgba(16,185,129,0.25); }
+    .metric-gradient-4 { background: linear-gradient(135deg, rgba(245,158,11,0.12), rgba(251,191,36,0.06)); border-color: rgba(245,158,11,0.25); }
+    .copy-btn:active { transform: scale(0.95); }
   </style>
 </head>
-<body class="min-h-full flex flex-col p-4 md:p-6 max-w-7xl mx-auto space-y-6">
+<body class="min-h-full flex flex-col">
 
-  <!-- Top Navigation & Access Control Bar -->
-  <header class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-5">
-    <div class="flex items-center space-x-3">
-      <div class="h-10 w-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center font-bold text-white shadow-lg shadow-indigo-500/25">
-        AO
-      </div>
+<!-- ========== HEADER ========== -->
+<header class="sticky top-0 z-40 glass border-b border-surface-700 px-4 md:px-6 py-3">
+  <div class="max-w-[1440px] mx-auto flex flex-wrap items-center justify-between gap-3">
+    <div class="flex items-center gap-3">
+      <div class="h-9 w-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center font-extrabold text-white text-sm shadow-lg shadow-indigo-500/20">O</div>
       <div>
         <div class="flex items-center gap-2">
-          <h1 class="text-xl font-bold tracking-tight text-white">AI Model Observer</h1>
-          <span id="role-badge" class="px-2 py-0.5 text-[11px] font-semibold rounded-full bg-slate-800 text-slate-400 border border-slate-700">
-            Checking Access...
-          </span>
+          <h1 class="text-lg font-bold tracking-tight text-white">AI Observer</h1>
+          <span id="role-badge" class="px-2 py-0.5 text-[10px] font-bold rounded-full bg-surface-800 text-slate-400 border border-surface-700">...</span>
         </div>
-        <p class="text-xs text-slate-400">Capture Proxy &bull; Telemetry &bull; Role-Based Access Control</p>
+        <p class="text-[11px] text-slate-500 -mt-0.5">Capture Proxy &bull; Telemetry &bull; Fine-Tuning Pipeline</p>
       </div>
     </div>
-
-    <div class="flex items-center gap-3">
-      <span id="health-badge" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-950 text-emerald-400 border border-emerald-800">
-        <span class="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
-        Connecting...
+    <div class="flex items-center gap-2">
+      <span id="health-badge" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-950/60 text-emerald-400 border border-emerald-800/50">
+        <span class="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse"></span>Connecting
       </span>
-      <button onclick="fetchData()" class="px-3 py-1.5 text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg border border-slate-700 transition">
-        Refresh
-      </button>
-      <button onclick="openAccessModal()" class="px-3 py-1.5 text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg shadow-sm transition">
-        Switch View / Login
-      </button>
+      <button onclick="fetchData()" class="px-2.5 py-1.5 text-[11px] font-medium bg-surface-800 hover:bg-surface-700 text-slate-300 rounded-lg border border-surface-700 transition">Refresh</button>
+      <button onclick="openAccessModal()" class="px-2.5 py-1.5 text-[11px] font-semibold bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg shadow-sm transition">Switch View</button>
     </div>
-  </header>
+  </div>
+</header>
 
-  <!-- User Scope Banner (Visible in Developer Mode) -->
-  <section id="developer-banner" class="hidden bg-gradient-to-r from-slate-900 to-indigo-950/40 border border-indigo-900/50 rounded-xl p-4 shadow-sm flex flex-wrap items-center justify-between gap-4">
-    <div class="flex items-center gap-3">
-      <div class="h-9 w-9 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold text-sm border border-indigo-500/30">
-        👤
-      </div>
+<main class="flex-1 max-w-[1440px] w-full mx-auto px-4 md:px-6 py-5 space-y-5">
+
+<!-- ========== DEVELOPER PROFILE BANNER ========== -->
+<section id="developer-banner" class="hidden card p-4 flex flex-wrap items-center justify-between gap-3 border-indigo-900/40 bg-gradient-to-r from-surface-900 to-indigo-950/30 fade-in">
+  <div class="flex items-center gap-3">
+    <div class="h-10 w-10 rounded-xl bg-indigo-500/15 text-indigo-400 flex items-center justify-center text-lg border border-indigo-500/25">👤</div>
+    <div>
+      <p class="text-xs font-semibold uppercase tracking-wider text-indigo-400">Personal Dashboard</p>
+      <p class="text-sm font-bold text-white" id="banner-user-name">dev</p>
+    </div>
+  </div>
+  <div class="flex items-center gap-3 text-[11px]">
+    <div class="bg-surface-950/60 px-3 py-1.5 rounded-lg border border-surface-700"><span class="text-slate-400">Key:</span> <span id="banner-masked-key" class="mono text-cyan-400 font-semibold ml-0.5">•••</span></div>
+    <div class="bg-surface-950/60 px-3 py-1.5 rounded-lg border border-surface-700"><span class="text-slate-400">Provider:</span> <span id="banner-provider" class="uppercase font-semibold text-slate-200 ml-0.5">—</span></div>
+  </div>
+</section>
+
+<!-- ========== METRICS GRID ========== -->
+<section class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+  <div class="card card-glow p-4 metric-gradient-1">
+    <span class="text-[10px] text-indigo-300/80 uppercase tracking-widest font-bold">Total Calls</span>
+    <p id="total-calls" class="text-2xl font-extrabold text-white mt-1">—</p>
+    <span id="total-calls-sub" class="text-[10px] text-slate-500">Proxied LLM traces</span>
+  </div>
+  <div class="card card-glow p-4 metric-gradient-2">
+    <span class="text-[10px] text-cyan-300/80 uppercase tracking-widest font-bold">Avg Latency</span>
+    <p id="avg-latency" class="text-2xl font-extrabold text-cyan-400 mt-1">—</p>
+    <span class="text-[10px] text-slate-500">Milliseconds / call</span>
+  </div>
+  <div class="card card-glow p-4 metric-gradient-3">
+    <span class="text-[10px] text-emerald-300/80 uppercase tracking-widest font-bold">Total Tokens</span>
+    <p id="total-tokens" class="text-2xl font-extrabold text-emerald-400 mt-1">—</p>
+    <span id="token-split" class="text-[10px] text-slate-500">In: — | Out: —</span>
+  </div>
+  <div class="card card-glow p-4 metric-gradient-4">
+    <span class="text-[10px] text-amber-300/80 uppercase tracking-widest font-bold">Est. Cost</span>
+    <p id="est-cost" class="text-2xl font-extrabold text-amber-400 mt-1">—</p>
+    <span id="cost-detail" class="text-[10px] text-slate-500">Based on public pricing</span>
+  </div>
+</section>
+
+<!-- ========== TAB NAVIGATION ========== -->
+<nav class="flex flex-wrap gap-1.5 bg-surface-950 p-1 rounded-xl border border-surface-700">
+  <button onclick="switchTab('overview')"   id="tab-overview"   class="tab-active   px-4 py-2 text-xs font-semibold rounded-lg transition-all">📊 Overview</button>
+  <button onclick="switchTab('traces')"     id="tab-traces"     class="tab-inactive px-4 py-2 text-xs font-semibold rounded-lg transition-all">🔍 Trace Explorer</button>
+  <button onclick="switchTab('export')"     id="tab-export"     class="tab-inactive px-4 py-2 text-xs font-semibold rounded-lg transition-all" style="display:none">📦 Dataset Export</button>
+  <button onclick="switchTab('setup')"      id="tab-setup"      class="tab-inactive px-4 py-2 text-xs font-semibold rounded-lg transition-all">⚡ IDE Setup</button>
+  <button onclick="switchTab('compare')"    id="tab-compare"    class="tab-inactive px-4 py-2 text-xs font-semibold rounded-lg transition-all">🏆 Compare Models</button>
+</nav>
+
+<!-- ====================== TAB: OVERVIEW ====================== -->
+<div id="panel-overview" class="space-y-5 fade-in">
+
+  <!-- ADMIN: Connected Developers -->
+  <section id="admin-developers-section" class="hidden card overflow-hidden">
+    <div class="p-4 border-b border-surface-700 flex flex-wrap justify-between items-center gap-2 bg-surface-950/50">
       <div>
-        <div class="flex items-center gap-2">
-          <span class="text-xs font-semibold uppercase tracking-wider text-indigo-400">Developer Profile:</span>
-          <span id="banner-user-name" class="font-bold text-white text-sm">dev</span>
-        </div>
-        <p class="text-xs text-slate-400">Showing only personal requests, configured models, and active tasks.</p>
+        <h2 class="text-sm font-bold text-violet-400 uppercase tracking-wider flex items-center gap-1.5">👑 Connected Developers</h2>
+        <p class="text-[11px] text-slate-500 mt-0.5">Developers who routed API keys through this Observer instance</p>
       </div>
+      <span id="connected-count" class="text-[11px] px-2.5 py-1 rounded-full bg-violet-950/60 text-violet-300 border border-violet-800/50 font-bold">0 developers</span>
     </div>
-    <div class="flex items-center gap-4 text-xs">
-      <div class="bg-slate-900/80 px-3 py-1.5 rounded-lg border border-slate-800">
-        <span class="text-slate-400">Configured Key:</span>
-        <span id="banner-masked-key" class="font-mono text-cyan-400 font-semibold ml-1">not-configured</span>
-      </div>
-      <div class="bg-slate-900/80 px-3 py-1.5 rounded-lg border border-slate-800">
-        <span class="text-slate-400">Provider:</span>
-        <span id="banner-provider" class="uppercase font-semibold text-slate-200 ml-1">GEMINI</span>
-      </div>
-    </div>
+    <div class="overflow-x-auto"><table class="w-full text-left text-[13px] text-slate-300"><thead class="bg-surface-950/70 text-[10px] text-slate-500 border-b border-surface-700 uppercase">
+      <tr><th class="py-2.5 px-4">Developer</th><th class="py-2.5 px-4">Project</th><th class="py-2.5 px-4">API Key</th><th class="py-2.5 px-4">Provider</th><th class="py-2.5 px-4">Models</th><th class="py-2.5 px-4">Calls</th><th class="py-2.5 px-4">Tokens</th><th class="py-2.5 px-4">Last Active</th><th class="py-2.5 px-4"></th></tr>
+    </thead><tbody id="developers-body" class="divide-y divide-surface-700"><tr><td colspan="9" class="py-6 text-center text-slate-600 text-xs">Loading...</td></tr></tbody></table></div>
   </section>
 
-  <!-- Metrics Grid -->
-  <section class="grid grid-cols-2 md:grid-cols-4 gap-4">
-    <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-sm">
-      <span class="text-xs text-slate-400 uppercase tracking-wider font-semibold">Total Calls</span>
-      <p id="total-calls" class="text-2xl font-bold text-white mt-1">-</p>
-      <span id="total-calls-sub" class="text-[11px] text-slate-500">Proxied LLM traces</span>
-    </div>
-    <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-sm">
-      <span class="text-xs text-slate-400 uppercase tracking-wider font-semibold">Avg Latency</span>
-      <p id="avg-latency" class="text-2xl font-bold text-indigo-400 mt-1">-</p>
-      <span class="text-[11px] text-slate-500">Milliseconds / call</span>
-    </div>
-    <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-sm">
-      <span class="text-xs text-slate-400 uppercase tracking-wider font-semibold">Total Tokens</span>
-      <p id="total-tokens" class="text-2xl font-bold text-cyan-400 mt-1">-</p>
-      <span id="token-split" class="text-[11px] text-slate-500">In: - | Out: -</span>
-    </div>
-    <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-sm">
-      <span class="text-xs text-slate-400 uppercase tracking-wider font-semibold">Overall Pass Rate</span>
-      <p id="pass-rate" class="text-2xl font-bold text-emerald-400 mt-1">-</p>
-      <span id="pass-counts" class="text-[11px] text-slate-500">- passes / - fails</span>
-    </div>
-  </section>
-
-  <!-- ADMIN ONLY: Connected Developers & Configured API Keys -->
-  <section id="admin-developers-section" class="hidden bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-sm">
-    <div class="p-4 border-b border-slate-800 flex flex-wrap justify-between items-center gap-2 bg-slate-950/40">
-      <div>
-        <h2 class="text-sm font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-2">
-          <span>👑</span> Connected Developers & Configured API Keys
-        </h2>
-        <p class="text-xs text-slate-400">All developers who connected their personal API keys to this central Observer instance</p>
+  <!-- Charts Row -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <div class="card p-4">
+      <div class="flex justify-between items-center mb-3">
+        <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider">Daily Activity</h3>
+        <select id="chart-range" onchange="fetchTimeseries()" class="text-[11px] bg-surface-800 border border-surface-700 text-slate-300 rounded-lg px-2 py-1 focus:outline-none">
+          <option value="7">Last 7 Days</option><option value="14">Last 14 Days</option><option value="30">Last 30 Days</option>
+        </select>
       </div>
-      <span id="connected-count" class="text-xs px-2.5 py-1 rounded-full bg-indigo-950 text-indigo-300 border border-indigo-800 font-semibold">
-        0 Active Developers
-      </span>
+      <canvas id="chart-activity" height="180"></canvas>
     </div>
-    <div class="overflow-x-auto">
-      <table class="w-full text-left text-sm text-slate-300">
-        <thead class="bg-slate-950/60 text-xs text-slate-400 border-b border-slate-800 uppercase">
-          <tr>
-            <th class="py-3 px-4">Developer</th>
-            <th class="py-3 px-4">Project</th>
-            <th class="py-3 px-4">Configured Key</th>
-            <th class="py-3 px-4">Provider</th>
-            <th class="py-3 px-4">Models Used</th>
-            <th class="py-3 px-4">Total Calls</th>
-            <th class="py-3 px-4">Total Tokens</th>
-            <th class="py-3 px-4">Last Active</th>
-            <th class="py-3 px-4">Action</th>
-          </tr>
-        </thead>
-        <tbody id="developers-body" class="divide-y divide-slate-800">
-          <tr><td colspan="9" class="py-6 text-center text-slate-500">Loading connected developers...</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </section>
-
-  <!-- Model Performance Leaderboard -->
-  <section class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-sm">
-    <div class="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-950/40">
-      <div>
-        <h2 class="text-sm font-semibold text-slate-200 uppercase tracking-wider">Model Performance Leaderboard</h2>
-        <p id="leaderboard-sub" class="text-xs text-slate-400">Aggregated execution performance and last-touch attribution</p>
-      </div>
-      <span id="active-filter-indicator" class="text-xs text-indigo-400 font-medium"></span>
-    </div>
-    <div class="overflow-x-auto">
-      <table class="w-full text-left text-sm text-slate-300">
-        <thead class="bg-slate-950/60 text-xs text-slate-400 border-b border-slate-800 uppercase">
-          <tr>
-            <th class="py-3 px-4">Model</th>
-            <th class="py-3 px-4">Calls</th>
-            <th class="py-3 px-4">Avg Latency</th>
-            <th class="py-3 px-4">Input Tokens</th>
-            <th class="py-3 px-4">Output Tokens</th>
-            <th class="py-3 px-4">Pass / Fail</th>
-            <th class="py-3 px-4">Success Rate</th>
-          </tr>
-        </thead>
-        <tbody id="models-body" class="divide-y divide-slate-800">
-          <tr><td colspan="7" class="py-6 text-center text-slate-500">Loading model performance...</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </section>
-
-  <!-- Recent Tasks & Outcomes -->
-  <section class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-sm">
-    <div class="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-950/40">
-      <div>
-        <h2 class="text-sm font-semibold text-slate-200 uppercase tracking-wider">Recent Tasks & Outcomes</h2>
-        <p id="tasks-sub" class="text-xs text-slate-400">Latest active development sessions</p>
-      </div>
-    </div>
-    <div class="overflow-x-auto">
-      <table class="w-full text-left text-sm text-slate-300">
-        <thead class="bg-slate-950/60 text-xs text-slate-400 border-b border-slate-800 uppercase">
-          <tr>
-            <th class="py-3 px-4">Task ID</th>
-            <th class="py-3 px-4">Project</th>
-            <th class="py-3 px-4">Task Type</th>
-            <th class="py-3 px-4">Calls</th>
-            <th class="py-3 px-4">Primary Model</th>
-            <th class="py-3 px-4">Outcome</th>
-            <th class="py-3 px-4">Created</th>
-          </tr>
-        </thead>
-        <tbody id="tasks-body" class="divide-y divide-slate-800">
-          <tr><td colspan="7" class="py-6 text-center text-slate-500">Loading tasks...</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </section>
-
-  <!-- Footer -->
-  <footer class="pt-4 border-t border-slate-800/80 text-xs text-slate-500 flex justify-between items-center">
-    <span>AI Model Observer &bull; Role-Based Access Control</span>
-    <span>Auto-refreshes every 5s</span>
-  </footer>
-
-  <!-- Access Control Modal (Login / Switch Role) -->
-  <div id="access-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
-    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-5">
-      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
-        <h3 class="font-bold text-white text-base">Select Dashboard View</h3>
-        <button onclick="closeAccessModal()" class="text-slate-400 hover:text-white">&times;</button>
-      </div>
-
-      <!-- Tab Buttons -->
-      <div class="grid grid-cols-2 gap-2 bg-slate-950 p-1 rounded-lg border border-slate-800 text-xs font-semibold">
-        <button id="tab-btn-dev" onclick="switchModalTab('dev')" class="py-2 rounded-md bg-indigo-600 text-white transition">
-          👤 Developer View
-        </button>
-        <button id="tab-btn-admin" onclick="switchModalTab('admin')" class="py-2 rounded-md text-slate-400 hover:text-white transition">
-          👑 Admin View
-        </button>
-      </div>
-
-      <!-- Developer Form -->
-      <div id="modal-tab-dev" class="space-y-4">
-        <p class="text-xs text-slate-400">View only your personal usage, configured API key, and tasks.</p>
-        <div>
-          <label class="block text-xs font-semibold text-slate-300 mb-1">Developer Name / Session ID</label>
-          <input id="modal-input-user" type="text" placeholder="e.g. alex" class="w-full px-3 py-2 text-sm bg-slate-950 border border-slate-800 rounded-lg text-white focus:outline-none focus:border-indigo-500">
-        </div>
-        <button onclick="submitDeveloperLogin()" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 font-semibold text-xs text-white rounded-lg transition shadow-md">
-          Enter Personal Dashboard
-        </button>
-      </div>
-
-      <!-- Admin Form -->
-      <div id="modal-tab-admin" class="space-y-4 hidden">
-        <p class="text-xs text-slate-400">Access full system visibility, connected developer keys, and export tools.</p>
-        <div>
-          <label class="block text-xs font-semibold text-slate-300 mb-1">Admin Secret Key / Token</label>
-          <input id="modal-input-admin-key" type="password" placeholder="Enter OBSERVER_ADMIN_KEY" class="w-full px-3 py-2 text-sm bg-slate-950 border border-slate-800 rounded-lg text-white focus:outline-none focus:border-indigo-500">
-        </div>
-        <button onclick="submitAdminLogin()" class="w-full py-2.5 bg-violet-600 hover:bg-violet-500 font-semibold text-xs text-white rounded-lg transition shadow-md">
-          Unlock Admin Dashboard
-        </button>
-      </div>
+    <div class="card p-4">
+      <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider mb-3">Token Distribution</h3>
+      <canvas id="chart-tokens" height="180"></canvas>
     </div>
   </div>
 
-  <script>
-    // State management
-    const urlParams = new URLSearchParams(window.location.search);
-    let state = {
-      role: 'guest', // 'admin' | 'dev'
-      user: urlParams.get('user') || localStorage.getItem('ao_user') || '',
-      adminToken: urlParams.get('admin_token') || urlParams.get('token') || localStorage.getItem('ao_admin_token') || '',
-      filterUser: null,
-    };
+  <!-- Model Leaderboard -->
+  <section class="card overflow-hidden">
+    <div class="p-4 border-b border-surface-700 bg-surface-950/50 flex justify-between items-center">
+      <div><h2 class="text-sm font-bold text-slate-200 uppercase tracking-wider">Model Performance Leaderboard</h2>
+      <p id="leaderboard-sub" class="text-[11px] text-slate-500 mt-0.5">Last-touch outcome attribution</p></div>
+      <span id="active-filter" class="text-[11px] text-indigo-400 font-medium cursor-pointer"></span>
+    </div>
+    <div class="overflow-x-auto"><table class="w-full text-left text-[13px] text-slate-300"><thead class="bg-surface-950/70 text-[10px] text-slate-500 border-b border-surface-700 uppercase">
+      <tr><th class="py-2.5 px-4">Model</th><th class="py-2.5 px-4">Calls</th><th class="py-2.5 px-4">Avg Latency</th><th class="py-2.5 px-4">In Tokens</th><th class="py-2.5 px-4">Out Tokens</th><th class="py-2.5 px-4">Pass / Fail</th><th class="py-2.5 px-4">Success</th><th class="py-2.5 px-4">Est. Cost</th></tr>
+    </thead><tbody id="models-body" class="divide-y divide-surface-700"><tr><td colspan="8" class="py-6 text-center text-slate-600 text-xs">Loading...</td></tr></tbody></table></div>
+  </section>
+</div>
 
-    function initAuth() {
-      if (state.adminToken) {
-        state.role = 'admin';
-      } else if (state.user) {
-        state.role = 'dev';
-      } else {
-        state.role = 'dev';
-        state.user = 'dev';
-      }
-      updateUIForRole();
+<!-- ====================== TAB: TRACE EXPLORER ====================== -->
+<div id="panel-traces" class="hidden space-y-4 fade-in">
+  <section class="card overflow-hidden">
+    <div class="p-4 border-b border-surface-700 bg-surface-950/50">
+      <h2 class="text-sm font-bold text-slate-200 uppercase tracking-wider">🔍 Recent Tasks & Trace Inspector</h2>
+      <p class="text-[11px] text-slate-500 mt-0.5">Click any task row to inspect the full trace — prompts, responses, tool calls, and outcomes</p>
+    </div>
+    <div class="overflow-x-auto"><table class="w-full text-left text-[13px] text-slate-300"><thead class="bg-surface-950/70 text-[10px] text-slate-500 border-b border-surface-700 uppercase">
+      <tr><th class="py-2.5 px-4">Task ID</th><th class="py-2.5 px-4">Project</th><th class="py-2.5 px-4">Type</th><th class="py-2.5 px-4">Calls</th><th class="py-2.5 px-4">Model</th><th class="py-2.5 px-4">Outcome</th><th class="py-2.5 px-4">Created</th></tr>
+    </thead><tbody id="tasks-body" class="divide-y divide-surface-700"><tr><td colspan="7" class="py-6 text-center text-slate-600 text-xs">Loading...</td></tr></tbody></table></div>
+  </section>
+</div>
+
+<!-- ========== TRACE INSPECTOR SLIDE-OVER ========== -->
+<div id="trace-panel" class="fixed inset-0 z-50 hidden">
+  <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="closeTracePanel()"></div>
+  <div class="absolute right-0 top-0 bottom-0 w-full max-w-2xl bg-surface-900 border-l border-surface-700 overflow-y-auto slide-enter">
+    <div class="sticky top-0 z-10 glass border-b border-surface-700 p-4 flex justify-between items-center">
+      <div><h3 class="text-sm font-bold text-white">Trace Inspector</h3><p id="trace-task-id" class="mono text-[11px] text-indigo-400 mt-0.5"></p></div>
+      <button onclick="closeTracePanel()" class="h-8 w-8 rounded-lg bg-surface-800 hover:bg-surface-700 text-slate-400 hover:text-white flex items-center justify-center text-lg transition">&times;</button>
+    </div>
+    <div id="trace-content" class="p-4 space-y-4"></div>
+  </div>
+</div>
+
+<!-- ====================== TAB: DATASET EXPORT ====================== -->
+<div id="panel-export" class="hidden space-y-4 fade-in">
+  <section class="card p-6 space-y-5">
+    <div>
+      <h2 class="text-sm font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2">📦 Training Dataset Export</h2>
+      <p class="text-[11px] text-slate-500 mt-1">Generate fine-tuning datasets from verified task telemetry. Only tasks with pass/accepted outcomes are included.</p>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div>
+        <label class="block text-[11px] font-bold text-slate-400 uppercase mb-1.5">Format</label>
+        <div class="flex gap-2">
+          <button id="btn-sft" onclick="setExportType('sft')" class="flex-1 py-2 rounded-lg text-xs font-bold bg-indigo-600 text-white border border-indigo-500 transition">SFT</button>
+          <button id="btn-dpo" onclick="setExportType('dpo')" class="flex-1 py-2 rounded-lg text-xs font-bold bg-surface-800 text-slate-400 border border-surface-700 transition">DPO</button>
+        </div>
+        <p id="export-type-desc" class="text-[10px] text-slate-500 mt-1.5">Supervised Fine-Tuning — ShareGPT format with verified prompt→response pairs.</p>
+      </div>
+      <div>
+        <label class="block text-[11px] font-bold text-slate-400 uppercase mb-1.5">Project Filter</label>
+        <input id="export-project" type="text" placeholder="All projects" class="w-full px-3 py-2 text-xs bg-surface-800 border border-surface-700 rounded-lg text-white focus:outline-none focus:border-indigo-500">
+      </div>
+      <div>
+        <label class="block text-[11px] font-bold text-slate-400 uppercase mb-1.5">Max Records</label>
+        <input id="export-limit" type="number" value="500" min="10" max="10000" class="w-full px-3 py-2 text-xs bg-surface-800 border border-surface-700 rounded-lg text-white focus:outline-none focus:border-indigo-500">
+      </div>
+    </div>
+    <div class="flex items-center gap-4">
+      <button onclick="runExport()" id="export-run-btn" class="px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-indigo-500/20 transition">Generate & Download .jsonl</button>
+      <span id="export-status" class="text-[11px] text-slate-500"></span>
+    </div>
+    <div id="export-preview" class="hidden card p-4 bg-surface-950 border-indigo-900/30 space-y-2">
+      <h4 class="text-xs font-bold text-indigo-400 uppercase">Export Summary</h4>
+      <div id="export-summary-content" class="text-xs text-slate-300 space-y-1"></div>
+    </div>
+  </section>
+</div>
+
+<!-- ====================== TAB: IDE SETUP ====================== -->
+<div id="panel-setup" class="hidden fade-in">
+  <div class="card p-6 space-y-5">
+    <div>
+      <h2 class="text-sm font-bold text-slate-200 uppercase tracking-wider">⚡ One-Click IDE Setup</h2>
+      <p class="text-[11px] text-slate-500 mt-1">Copy the configuration snippet for your editor and start routing all LLM calls through Observer in 10 seconds.</p>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="ide-cards"></div>
+  </div>
+</div>
+
+<!-- ====================== TAB: MODEL COMPARE ====================== -->
+<div id="panel-compare" class="hidden fade-in">
+  <section class="card p-6 space-y-5">
+    <div>
+      <h2 class="text-sm font-bold text-slate-200 uppercase tracking-wider">🏆 Model Comparison</h2>
+      <p class="text-[11px] text-slate-500 mt-1">Side-by-side comparison of real-world performance across models observed in production.</p>
+    </div>
+    <div id="compare-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+    <div class="card p-4 bg-surface-950 border-indigo-900/30">
+      <h4 class="text-xs font-bold text-indigo-400 uppercase mb-2">Recommendation</h4>
+      <p id="compare-recommendation" class="text-xs text-slate-300">Collecting performance data...</p>
+    </div>
+  </section>
+</div>
+
+</main>
+
+<footer class="border-t border-surface-700 px-6 py-3 text-center text-[10px] text-slate-600">AI Model Observer &bull; Role-Based Analytics Dashboard &bull; Auto-refresh 8s</footer>
+
+<!-- ========== ACCESS MODAL ========== -->
+<div id="access-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+  <div class="bg-surface-900 border border-surface-700 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-5 fade-in">
+    <div class="flex items-center justify-between border-b border-surface-700 pb-3">
+      <h3 class="font-bold text-white text-sm">Select Dashboard View</h3>
+      <button onclick="closeAccessModal()" class="text-slate-400 hover:text-white text-lg">&times;</button>
+    </div>
+    <div class="grid grid-cols-2 gap-2 bg-surface-950 p-1 rounded-lg border border-surface-700 text-[11px] font-bold">
+      <button id="tab-btn-dev" onclick="switchModalTab('dev')" class="py-2 rounded-md bg-indigo-600 text-white transition">👤 Developer</button>
+      <button id="tab-btn-admin" onclick="switchModalTab('admin')" class="py-2 rounded-md text-slate-400 hover:text-white transition">👑 Admin</button>
+    </div>
+    <div id="modal-tab-dev" class="space-y-3">
+      <p class="text-[11px] text-slate-400">View your personal usage, configured API key, and tasks.</p>
+      <input id="modal-input-user" type="text" placeholder="Your developer name (e.g. alex)" class="w-full px-3 py-2 text-xs bg-surface-950 border border-surface-700 rounded-lg text-white focus:outline-none focus:border-indigo-500">
+      <button onclick="submitDeveloperLogin()" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 font-bold text-[11px] text-white rounded-lg transition shadow-md">Enter Personal Dashboard</button>
+    </div>
+    <div id="modal-tab-admin" class="space-y-3 hidden">
+      <p class="text-[11px] text-slate-400">Access full system visibility, connected developers, and export tools.</p>
+      <input id="modal-input-admin-key" type="password" placeholder="Enter OBSERVER_ADMIN_KEY" class="w-full px-3 py-2 text-xs bg-surface-950 border border-surface-700 rounded-lg text-white focus:outline-none focus:border-indigo-500">
+      <button onclick="submitAdminLogin()" class="w-full py-2.5 bg-violet-600 hover:bg-violet-500 font-bold text-[11px] text-white rounded-lg transition shadow-md">Unlock Admin Dashboard</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ────────── State ──────────
+const P = new URLSearchParams(location.search);
+let S = {
+  role: 'guest',
+  user: P.get('user') || localStorage.getItem('ao_user') || '',
+  adminToken: P.get('admin_token') || P.get('token') || localStorage.getItem('ao_admin_token') || '',
+  filterUser: null,
+  exportType: 'sft',
+  statsCache: [],
+};
+let activityChart = null, tokenChart = null;
+
+// ────────── Cost Lookup (per 1M tokens) ──────────
+const COST = {
+  'gemini-3.1-flash-lite': { i: 0.075, o: 0.30 },
+  'gemini-3.8-flash': { i: 0.15, o: 0.60 },
+  'gemini-2.5-flash': { i: 0.15, o: 0.60 },
+  'gemini-2.5-pro': { i: 1.25, o: 5.00 },
+  'claude-3-5-sonnet': { i: 3.00, o: 15.00 },
+  'claude-3-opus': { i: 15.00, o: 75.00 },
+  'claude-sonnet-4': { i: 3.00, o: 15.00 },
+  'gpt-4o': { i: 2.50, o: 10.00 },
+  'gpt-4o-mini': { i: 0.15, o: 0.60 },
+  'deepseek-chat': { i: 0.27, o: 1.10 },
+  'deepseek-coder': { i: 0.14, o: 0.28 },
+  '_default': { i: 0.50, o: 2.00 },
+};
+function estimateCost(model, inTok, outTok) {
+  let key = Object.keys(COST).find(k => model.toLowerCase().includes(k));
+  let r = COST[key] || COST['_default'];
+  return ((inTok||0) * r.i + (outTok||0) * r.o) / 1_000_000;
+}
+function fmtCost(v) { return v < 0.01 ? '<$0.01' : '$' + v.toFixed(2); }
+
+// ────────── Init ──────────
+function initAuth() {
+  if (S.adminToken) S.role = 'admin';
+  else if (S.user) S.role = 'dev';
+  else { S.role = 'dev'; S.user = 'dev'; }
+  updateUIForRole();
+}
+function updateUIForRole() {
+  const badge = document.getElementById('role-badge');
+  const banner = document.getElementById('developer-banner');
+  const adminSec = document.getElementById('admin-developers-section');
+  const exportTab = document.getElementById('tab-export');
+  if (S.role === 'admin') {
+    badge.className = "px-2 py-0.5 text-[10px] font-bold rounded-full bg-violet-950/60 text-violet-300 border border-violet-800/50";
+    badge.textContent = "👑 Admin";
+    banner.classList.add('hidden');
+    adminSec.classList.remove('hidden');
+    exportTab.style.display = '';
+  } else {
+    badge.className = "px-2 py-0.5 text-[10px] font-bold rounded-full bg-cyan-950/60 text-cyan-300 border border-cyan-800/50";
+    badge.textContent = "👤 " + S.user;
+    banner.classList.remove('hidden');
+    adminSec.classList.add('hidden');
+    exportTab.style.display = 'none';
+    document.getElementById('banner-user-name').textContent = S.user;
+  }
+}
+
+// ────────── Tabs ──────────
+const TABS = ['overview','traces','export','setup','compare'];
+function switchTab(t) {
+  TABS.forEach(id => {
+    document.getElementById('panel-'+id).classList.toggle('hidden', id !== t);
+    const btn = document.getElementById('tab-'+id);
+    btn.className = id === t ? 'tab-active px-4 py-2 text-xs font-semibold rounded-lg transition-all' : 'tab-inactive px-4 py-2 text-xs font-semibold rounded-lg transition-all';
+    if (id === 'export' && S.role !== 'admin') btn.style.display = 'none';
+  });
+  if (t === 'setup') renderIDECards();
+  if (t === 'compare') renderCompare();
+  if (t === 'overview') { setTimeout(() => fetchTimeseries(), 100); }
+}
+
+// ────────── Fetch Data ──────────
+function authHeaders() {
+  let h = {};
+  if (S.adminToken) { h['X-Admin-Token'] = S.adminToken; h['Authorization'] = 'Bearer ' + S.adminToken; }
+  return h;
+}
+async function fetchData() {
+  try {
+    const hRes = await fetch('/health'); const hD = await hRes.json();
+    const hBadge = document.getElementById('health-badge');
+    if (hD.ok) { hBadge.className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-950/60 text-emerald-400 border border-emerald-800/50"; hBadge.innerHTML='<span class="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse"></span>Online'; }
+    else { hBadge.className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-rose-950/60 text-rose-400 border border-rose-800/50"; hBadge.innerHTML='<span class="h-1.5 w-1.5 rounded-full bg-rose-400"></span>Offline'; }
+
+    let sq = '', tq = '', h = authHeaders();
+    if (S.role === 'admin') {
+      if (S.filterUser) { sq = '?session_id='+encodeURIComponent(S.filterUser); tq = '?session_id='+encodeURIComponent(S.filterUser); document.getElementById('active-filter').textContent = '✕ Filter: '+S.filterUser; document.getElementById('active-filter').onclick = () => { S.filterUser=null; fetchData(); }; }
+      else { document.getElementById('active-filter').textContent=''; }
+      fetchAdminDevelopers(h);
+    } else {
+      sq = '?session_id='+encodeURIComponent(S.user);
+      tq = '?session_id='+encodeURIComponent(S.user);
+      fetchUserProfile(S.user);
     }
+    const sRes = await fetch('/stats'+sq, {headers:h}); if (sRes.ok) { S.statsCache = await sRes.json(); renderStats(S.statsCache); }
+    const tRes = await fetch('/tasks'+tq, {headers:h}); if (tRes.ok) renderTasks(await tRes.json());
+    fetchTimeseries();
+  } catch(e) { console.error('Refresh:', e); }
+}
 
-    function updateUIForRole() {
-      const roleBadge = document.getElementById('role-badge');
-      const devBanner = document.getElementById('developer-banner');
-      const adminSection = document.getElementById('admin-developers-section');
-      const totalCallsSub = document.getElementById('total-calls-sub');
-      const leaderboardSub = document.getElementById('leaderboard-sub');
-      const tasksSub = document.getElementById('tasks-sub');
+async function fetchAdminDevelopers(h) {
+  try { const r = await fetch('/admin/connected-users',{headers:h}); if (r.ok) { const d = await r.json(); renderDevelopers(d.users||[]); } } catch(e) {}
+}
+async function fetchUserProfile(u) {
+  try { const r = await fetch('/user/profile?user='+encodeURIComponent(u)); if (r.ok) { const d = await r.json(); const p=d.profile||{}; document.getElementById('banner-masked-key').textContent=p.key_masked||'—'; document.getElementById('banner-provider').textContent=(p.provider||'—').toUpperCase(); } } catch(e) {}
+}
+async function fetchTimeseries() {
+  const days = document.getElementById('chart-range').value;
+  let q = '?days='+days;
+  if (S.role !== 'admin') q += '&session_id='+encodeURIComponent(S.user);
+  else if (S.filterUser) q += '&session_id='+encodeURIComponent(S.filterUser);
+  try {
+    const r = await fetch('/stats/timeseries'+q, {headers:authHeaders()});
+    if (r.ok) { const d = await r.json(); renderCharts(d.series||[], parseInt(days)); }
+  } catch(e) { console.warn('Timeseries:', e); }
+}
 
-      if (state.role === 'admin') {
-        roleBadge.className = "px-2.5 py-0.5 text-[11px] font-bold rounded-full bg-violet-950 text-violet-300 border border-violet-800 shadow-sm";
-        roleBadge.innerHTML = "👑 Admin View";
-        devBanner.classList.add('hidden');
-        adminSection.classList.remove('hidden');
-        totalCallsSub.innerText = "All team traces";
-        leaderboardSub.innerText = "Team-wide model performance leaderboard";
-        tasksSub.innerText = "Team-wide tasks and outcome signals";
-      } else {
-        roleBadge.className = "px-2.5 py-0.5 text-[11px] font-bold rounded-full bg-cyan-950 text-cyan-300 border border-cyan-800 shadow-sm";
-        roleBadge.innerHTML = `👤 Developer: ${state.user}`;
-        devBanner.classList.remove('hidden');
-        adminSection.classList.add('hidden');
-        document.getElementById('banner-user-name').innerText = state.user;
-        totalCallsSub.innerText = `Traces for ${state.user}`;
-        leaderboardSub.innerText = `Models configured and used by ${state.user}`;
-        tasksSub.innerText = `Tasks executed by ${state.user}`;
-      }
-    }
+// ────────── Render: Developers ──────────
+function renderDevelopers(devs) {
+  const tb = document.getElementById('developers-body');
+  document.getElementById('connected-count').textContent = devs.length + ' developer' + (devs.length===1?'':'s');
+  if (!devs.length) { tb.innerHTML='<tr><td colspan="9" class="py-6 text-center text-slate-600 text-xs">No developers connected yet.</td></tr>'; return; }
+  tb.innerHTML='';
+  devs.forEach(d => {
+    const models = (d.models_used||[]).map(m=>'<span class="px-1.5 py-0.5 rounded bg-surface-800 text-[10px] mono border border-surface-700">'+m+'</span>').join(' ')||'—';
+    const tr = document.createElement('tr'); tr.className='hover:bg-surface-800/40 transition cursor-pointer';
+    tr.innerHTML = `<td class="py-2.5 px-4 font-semibold text-white text-xs flex items-center gap-2"><span class="h-6 w-6 rounded-full bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 flex items-center justify-center text-[10px] font-bold">${(d.session_id||'?')[0].toUpperCase()}</span>${d.session_id}</td>
+    <td class="py-2.5 px-4 text-[11px] text-slate-500 mono">${d.project||'—'}</td>
+    <td class="py-2.5 px-4 mono text-cyan-400 text-[11px] font-bold">${d.key_masked}</td>
+    <td class="py-2.5 px-4 text-[11px] uppercase font-semibold text-slate-400">${d.provider||'—'}</td>
+    <td class="py-2.5 px-4 text-[11px]">${models}</td>
+    <td class="py-2.5 px-4 font-bold text-slate-200 text-xs">${(d.total_calls||0).toLocaleString()}</td>
+    <td class="py-2.5 px-4 text-[11px] text-slate-500">${((d.total_input_tokens||0)+(d.total_output_tokens||0)).toLocaleString()}</td>
+    <td class="py-2.5 px-4 text-[11px] text-slate-500">${d.last_seen?new Date(d.last_seen).toLocaleString():'-'}</td>
+    <td class="py-2.5 px-4"><button onclick="event.stopPropagation();S.filterUser='${d.session_id}';fetchData()" class="px-2 py-1 bg-surface-800 hover:bg-surface-700 text-indigo-300 rounded text-[10px] font-bold border border-surface-700 transition">Inspect</button></td>`;
+    tb.appendChild(tr);
+  });
+}
 
-    async function fetchData() {
-      try {
-        // 1. Health
-        const hRes = await fetch('/health');
-        const hData = await hRes.json();
-        const badge = document.getElementById('health-badge');
-        if (hData.ok) {
-          badge.className = "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-950 text-emerald-400 border border-emerald-800";
-          badge.innerHTML = '<span class="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span> DB Ready';
-        } else {
-          badge.className = "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-rose-950 text-rose-400 border border-rose-800";
-          badge.innerHTML = '<span class="h-2 w-2 rounded-full bg-rose-400"></span> DB Unready';
-        }
+// ────────── Render: Stats ──────────
+function renderStats(stats) {
+  let tc=0,ti=0,to=0,tp=0,tf=0,tl=0,totalCost=0;
+  const tb=document.getElementById('models-body');
+  if(!stats||!stats.length){tb.innerHTML='<tr><td colspan="8" class="py-6 text-center text-slate-600 text-xs">No data.</td></tr>';['total-calls','avg-latency','total-tokens','est-cost'].forEach(id=>document.getElementById(id).textContent='—');return;}
+  tb.innerHTML='';
+  stats.forEach(m=>{
+    tc+=m.calls||0; ti+=m.input_tokens||0; to+=m.output_tokens||0; tp+=m.passes||0; tf+=m.fails||0; tl+=(m.avg_latency_ms||0)*(m.calls||0);
+    const cost=estimateCost(m.model,m.input_tokens,m.output_tokens); totalCost+=cost;
+    const ot=(m.passes||0)+(m.fails||0); const rate=ot>0?Math.round((m.passes/ot)*100):null;
+    const rc=rate>=70?'text-emerald-400':rate>=40?'text-amber-400':'text-slate-500';
+    const tr=document.createElement('tr'); tr.className='hover:bg-surface-800/40 transition';
+    tr.innerHTML=`<td class="py-2.5 px-4 mono font-semibold text-slate-200 text-xs">${m.model}</td>
+    <td class="py-2.5 px-4 font-bold text-white">${(m.calls||0).toLocaleString()}</td>
+    <td class="py-2.5 px-4 text-slate-400 text-xs">${m.avg_latency_ms?m.avg_latency_ms+'ms':'—'}</td>
+    <td class="py-2.5 px-4 text-slate-500 text-[11px]">${(m.input_tokens||0).toLocaleString()}</td>
+    <td class="py-2.5 px-4 text-slate-500 text-[11px]">${(m.output_tokens||0).toLocaleString()}</td>
+    <td class="py-2.5 px-4 text-xs"><span class="text-emerald-400 font-bold">${m.passes||0}</span><span class="text-slate-600 mx-0.5">/</span><span class="text-rose-400 font-bold">${m.fails||0}</span></td>
+    <td class="py-2.5 px-4 font-bold ${rc}">${rate!==null?rate+'%':'—'}</td>
+    <td class="py-2.5 px-4 text-amber-400/70 text-[11px] font-semibold">${fmtCost(cost)}</td>`;
+    tb.appendChild(tr);
+  });
+  document.getElementById('total-calls').textContent=tc.toLocaleString();
+  document.getElementById('avg-latency').textContent=tc>0?Math.round(tl/tc)+'ms':'—';
+  document.getElementById('total-tokens').textContent=(ti+to).toLocaleString();
+  document.getElementById('token-split').textContent='In: '+ti.toLocaleString()+' | Out: '+to.toLocaleString();
+  document.getElementById('est-cost').textContent=fmtCost(totalCost);
+}
 
-        // Prepare Query & Headers
-        let headers = {};
-        let statsQuery = '';
-        let tasksQuery = '';
+// ────────── Render: Tasks ──────────
+function renderTasks(tasks) {
+  const tb=document.getElementById('tasks-body');
+  if(!tasks||!tasks.length){tb.innerHTML='<tr><td colspan="7" class="py-6 text-center text-slate-600 text-xs">No tasks.</td></tr>';return;}
+  tb.innerHTML='';
+  tasks.forEach(t=>{
+    let bc='bg-surface-800 text-slate-400 border-surface-700',st=t.latest_outcome||'running';
+    if(['pass','accepted'].includes(t.latest_outcome)){bc='bg-emerald-950/60 text-emerald-400 border-emerald-800/50';}
+    else if(['fail','rejected'].includes(t.latest_outcome)){bc='bg-rose-950/60 text-rose-400 border-rose-800/50';}
+    else if(t.latest_outcome==='edited'){bc='bg-amber-950/60 text-amber-400 border-amber-800/50';}
+    const tr=document.createElement('tr'); tr.className='hover:bg-surface-800/40 transition cursor-pointer'; tr.onclick=()=>openTracePanel(t.task_id);
+    tr.innerHTML=`<td class="py-2.5 px-4 mono text-xs font-bold text-indigo-300">${t.task_id}</td>
+    <td class="py-2.5 px-4 text-[11px] text-slate-500">${t.project||'—'}</td>
+    <td class="py-2.5 px-4 text-[11px] text-slate-500">${t.task_type||'—'}</td>
+    <td class="py-2.5 px-4 text-xs font-bold text-slate-200">${t.call_count||0}</td>
+    <td class="py-2.5 px-4 mono text-[11px] text-slate-300">${t.primary_model||'—'}</td>
+    <td class="py-2.5 px-4"><span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${bc}">${st}</span></td>
+    <td class="py-2.5 px-4 text-[11px] text-slate-500">${t.created_at?new Date(t.created_at).toLocaleString():'-'}</td>`;
+    tb.appendChild(tr);
+  });
+}
 
-        if (state.role === 'admin') {
-          if (state.adminToken) {
-            headers['X-Admin-Token'] = state.adminToken;
-            headers['Authorization'] = `Bearer ${state.adminToken}`;
-          }
-          if (state.filterUser) {
-            statsQuery = `?session_id=${encodeURIComponent(state.filterUser)}`;
-            tasksQuery = `?session_id=${encodeURIComponent(state.filterUser)}`;
-            document.getElementById('active-filter-indicator').innerText = `Filtered: ${state.filterUser} (click to clear)`;
-            document.getElementById('active-filter-indicator').onclick = () => { state.filterUser = null; fetchData(); };
-          } else {
-            document.getElementById('active-filter-indicator').innerText = '';
-          }
-          // Fetch Admin Connected Developers
-          fetchAdminDevelopers(headers);
-        } else {
-          statsQuery = `?session_id=${encodeURIComponent(state.user)}`;
-          tasksQuery = `?session_id=${encodeURIComponent(state.user)}`;
-          // Fetch user profile details
-          fetchUserProfile(state.user);
-        }
-
-        // 2. Fetch Stats
-        const sRes = await fetch('/stats' + statsQuery, { headers });
-        if (sRes.ok) {
-          const stats = await sRes.json();
-          renderStats(stats);
-        }
-
-        // 3. Fetch Tasks
-        const tRes = await fetch('/tasks' + tasksQuery, { headers });
-        if (tRes.ok) {
-          const tasks = await tRes.json();
-          renderTasks(tasks);
-        }
-      } catch (err) {
-        console.error("Dashboard refresh error:", err);
-      }
-    }
-
-    async function fetchAdminDevelopers(headers) {
-      try {
-        const res = await fetch('/admin/connected-users', { headers });
-        if (res.ok) {
-          const data = await res.json();
-          renderDevelopers(data.users || []);
-        } else if (res.status === 401) {
-          console.warn("Admin token invalid or unauthenticated.");
-        }
-      } catch (e) {
-        console.error("Failed to fetch connected developers:", e);
-      }
-    }
-
-    async function fetchUserProfile(user) {
-      try {
-        const res = await fetch(`/user/profile?user=${encodeURIComponent(user)}`);
-        if (res.ok) {
-          const data = await res.json();
-          const p = data.profile || {};
-          document.getElementById('banner-masked-key').innerText = p.key_masked || 'not-configured';
-          document.getElementById('banner-provider').innerText = (p.provider || 'unknown').toUpperCase();
-        }
-      } catch (e) {
-        console.warn("Profile fetch skipped:", e);
-      }
-    }
-
-    function renderDevelopers(devs) {
-      const tbody = document.getElementById('developers-body');
-      document.getElementById('connected-count').innerText = `${devs.length} Connected Developer${devs.length === 1 ? '' : 's'}`;
-
-      if (!devs || devs.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9" class="py-6 text-center text-slate-500">No developers have connected personal API keys yet.</td></tr>';
-        return;
-      }
-
-      tbody.innerHTML = '';
-      devs.forEach(d => {
-        const row = document.createElement('tr');
-        row.className = "hover:bg-slate-800/40 transition";
-        const models = (d.models_used || []).map(m => `<span class="px-1.5 py-0.5 rounded bg-slate-800 text-[11px] font-mono border border-slate-700">${m}</span>`).join(' ') || '-';
-        const lastActive = d.last_seen ? new Date(d.last_seen).toLocaleTimeString() : '-';
-        const totalTok = ((d.total_input_tokens || 0) + (d.total_output_tokens || 0)).toLocaleString();
-
-        row.innerHTML = `
-          <td class="py-3 px-4 font-semibold text-white flex items-center gap-2">
-            <span class="h-6 w-6 rounded-full bg-indigo-600/30 text-indigo-300 border border-indigo-500/40 flex items-center justify-center text-xs font-bold">
-              ${(d.session_id || 'U')[0].toUpperCase()}
-            </span>
-            ${d.session_id}
-          </td>
-          <td class="py-3 px-4 text-xs text-slate-400 font-mono">${d.project || '-'}</td>
-          <td class="py-3 px-4 font-mono text-cyan-400 text-xs font-semibold">${d.key_masked}</td>
-          <td class="py-3 px-4 text-xs uppercase font-medium text-slate-300">${d.provider || 'custom'}</td>
-          <td class="py-3 px-4 text-xs">${models}</td>
-          <td class="py-3 px-4 font-semibold text-slate-100">${(d.total_calls || 0).toLocaleString()}</td>
-          <td class="py-3 px-4 text-xs text-slate-400">${totalTok}</td>
-          <td class="py-3 px-4 text-xs text-slate-500">${lastActive}</td>
-          <td class="py-3 px-4">
-            <button onclick="filterByDeveloper('${d.session_id}')" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-indigo-300 rounded text-xs font-medium border border-slate-700 transition">
-              Inspect
-            </button>
-          </td>
-        `;
-        tbody.appendChild(row);
+// ────────── Trace Inspector ──────────
+async function openTracePanel(taskId) {
+  document.getElementById('trace-panel').classList.remove('hidden');
+  document.getElementById('trace-task-id').textContent = taskId;
+  const content = document.getElementById('trace-content');
+  content.innerHTML = '<p class="text-xs text-slate-500 animate-pulse">Loading trace data...</p>';
+  try {
+    const r = await fetch('/tasks/'+encodeURIComponent(taskId), {headers:authHeaders()});
+    if (!r.ok) { content.innerHTML = '<p class="text-xs text-rose-400">Failed to load trace.</p>'; return; }
+    const d = await r.json();
+    let html = '';
+    // Task Info
+    const tk = d.task||{};
+    html += `<div class="card p-3 space-y-1"><h4 class="text-[10px] font-bold text-indigo-400 uppercase tracking-wider">Task Details</h4>
+    <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px]">
+      <div><span class="text-slate-500">Project:</span> <span class="text-white font-semibold">${tk.project||'—'}</span></div>
+      <div><span class="text-slate-500">Type:</span> <span class="text-white font-semibold">${tk.task_type||'—'}</span></div>
+      <div><span class="text-slate-500">Title:</span> <span class="text-white font-semibold">${tk.title||'—'}</span></div>
+      <div><span class="text-slate-500">Created:</span> <span class="text-white">${tk.created_at?new Date(tk.created_at).toLocaleString():'—'}</span></div>
+    </div></div>`;
+    // Outcomes
+    if (d.outcomes && d.outcomes.length) {
+      html += '<div class="card p-3 space-y-2"><h4 class="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">Outcomes & Signals</h4>';
+      d.outcomes.forEach(o => {
+        let oc = o.status==='pass'||o.status==='accepted' ? 'text-emerald-400 bg-emerald-950/40 border-emerald-800/40' : 'text-rose-400 bg-rose-950/40 border-rose-800/40';
+        html += `<div class="flex items-start gap-2 p-2 rounded-lg border ${oc}"><span class="text-[10px] font-bold uppercase">${o.kind}: ${o.status}</span>`;
+        if (o.details && typeof o.details === 'object') html += `<pre class="text-[10px] text-slate-300 ml-auto mono whitespace-pre-wrap">${JSON.stringify(o.details,null,2)}</pre>`;
+        html += '</div>';
       });
+      html += '</div>';
     }
-
-    function filterByDeveloper(dev) {
-      state.filterUser = dev;
-      fetchData();
-    }
-
-    function renderStats(stats) {
-      let totalCalls = 0;
-      let totalIn = 0;
-      let totalOut = 0;
-      let totalPasses = 0;
-      let totalFails = 0;
-      let totalLatencySum = 0;
-
-      const tbody = document.getElementById('models-body');
-      if (!stats || stats.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="py-6 text-center text-slate-500">No model usage recorded for this view.</td></tr>';
-        document.getElementById('total-calls').innerText = '0';
-        document.getElementById('avg-latency').innerText = '-';
-        document.getElementById('total-tokens').innerText = '0';
-        document.getElementById('token-split').innerText = 'In: 0 | Out: 0';
-        document.getElementById('pass-rate').innerText = 'N/A';
-        document.getElementById('pass-counts').innerText = '0 passes / 0 fails';
-        return;
-      }
-
-      tbody.innerHTML = '';
-      stats.forEach(m => {
-        totalCalls += (m.calls || 0);
-        totalIn += (m.input_tokens || 0);
-        totalOut += (m.output_tokens || 0);
-        totalPasses += (m.passes || 0);
-        totalFails += (m.fails || 0);
-        totalLatencySum += ((m.avg_latency_ms || 0) * (m.calls || 0));
-
-        const outcomeTotal = (m.passes || 0) + (m.fails || 0);
-        const rate = outcomeTotal > 0 ? Math.round((m.passes / outcomeTotal) * 100) : null;
-        const rateStr = rate !== null ? `${rate}%` : 'N/A';
-        const rateColor = rate >= 70 ? 'text-emerald-400' : (rate >= 40 ? 'text-amber-400' : 'text-slate-400');
-
-        const row = document.createElement('tr');
-        row.className = "hover:bg-slate-800/40 transition";
-        row.innerHTML = `
-          <td class="py-3 px-4 font-mono font-medium text-slate-200 text-xs">${m.model}</td>
-          <td class="py-3 px-4 font-semibold text-slate-100">${(m.calls || 0).toLocaleString()}</td>
-          <td class="py-3 px-4 text-slate-300">${m.avg_latency_ms ? m.avg_latency_ms + ' ms' : '-'}</td>
-          <td class="py-3 px-4 text-slate-400 text-xs">${(m.input_tokens || 0).toLocaleString()}</td>
-          <td class="py-3 px-4 text-slate-400 text-xs">${(m.output_tokens || 0).toLocaleString()}</td>
-          <td class="py-3 px-4 text-xs"><span class="text-emerald-400 font-semibold">${m.passes || 0}</span> / <span class="text-rose-400 font-semibold">${m.fails || 0}</span></td>
-          <td class="py-3 px-4 font-bold ${rateColor}">${rateStr}</td>
-        `;
-        tbody.appendChild(row);
+    // LLM Calls
+    if (d.calls && d.calls.length) {
+      html += `<div class="space-y-2"><h4 class="text-[10px] font-bold text-cyan-400 uppercase tracking-wider px-1">LLM Calls (${d.calls.length})</h4>`;
+      d.calls.forEach((c, i) => {
+        const latColor = (c.latency_ms||0) > 5000 ? 'text-amber-400' : 'text-slate-300';
+        html += `<details class="card group"><summary class="p-3 cursor-pointer flex items-center justify-between hover:bg-surface-800/40 rounded-2xl transition">
+          <div class="flex items-center gap-2">
+            <span class="h-5 w-5 rounded bg-surface-800 flex items-center justify-center text-[10px] font-bold text-slate-400 border border-surface-700">${i+1}</span>
+            <span class="mono text-xs font-semibold text-slate-200">${c.model||'—'}</span>
+            <span class="text-[10px] ${c.status_code===200?'text-emerald-400':'text-rose-400'} font-bold">${c.status_code||'—'}</span>
+          </div>
+          <div class="flex items-center gap-3 text-[10px]">
+            <span class="${latColor} font-semibold">${c.latency_ms?c.latency_ms+'ms':'—'}</span>
+            <span class="text-slate-500">${(c.input_tokens||0)}→${(c.output_tokens||0)} tok</span>
+          </div>
+        </summary>
+        <div class="px-3 pb-3 space-y-2 border-t border-surface-700 mt-1 pt-2 text-[11px]">
+          <div><span class="text-slate-500 text-[10px] font-bold uppercase">Upstream:</span> <span class="mono text-slate-400">${c.upstream||'—'}</span></div>
+          <div><span class="text-slate-500 text-[10px] font-bold uppercase">Style:</span> <span class="text-slate-400">${c.api_style||'—'}</span></div>
+          ${c.error?'<div class="p-2 rounded-lg bg-rose-950/30 border border-rose-800/30 text-rose-300 mono text-[10px]">'+c.error+'</div>':''}
+        </div></details>`;
       });
-
-      document.getElementById('total-calls').innerText = totalCalls.toLocaleString();
-      const avgLat = totalCalls > 0 ? Math.round(totalLatencySum / totalCalls) : 0;
-      document.getElementById('avg-latency').innerText = `${avgLat} ms`;
-      document.getElementById('total-tokens').innerText = (totalIn + totalOut).toLocaleString();
-      document.getElementById('token-split').innerText = `In: ${totalIn.toLocaleString()} | Out: ${totalOut.toLocaleString()}`;
-
-      const totalOutcomes = totalPasses + totalFails;
-      if (totalOutcomes > 0) {
-        const passPercent = Math.round((totalPasses / totalOutcomes) * 100);
-        document.getElementById('pass-rate').innerText = `${passPercent}%`;
-        document.getElementById('pass-counts').innerText = `${totalPasses} passes / ${totalFails} fails`;
-      } else {
-        document.getElementById('pass-rate').innerText = 'N/A';
-        document.getElementById('pass-counts').innerText = 'No outcomes reported';
-      }
+      html += '</div>';
     }
+    content.innerHTML = html;
+  } catch(e) { content.innerHTML = '<p class="text-xs text-rose-400">Error: '+e+'</p>'; }
+}
+function closeTracePanel() { document.getElementById('trace-panel').classList.add('hidden'); }
 
-    function renderTasks(tasks) {
-      const tbody = document.getElementById('tasks-body');
-      if (!tasks || tasks.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="py-6 text-center text-slate-500">No tasks recorded yet for this view.</td></tr>';
-        return;
-      }
-      tbody.innerHTML = '';
-      tasks.forEach(t => {
-        let badgeClass = "bg-slate-800 text-slate-400 border border-slate-700";
-        let statusText = t.latest_outcome || 'in-progress';
-        if (['pass', 'accepted'].includes(t.latest_outcome)) {
-          badgeClass = "bg-emerald-950 text-emerald-400 border border-emerald-800";
-        } else if (['fail', 'rejected'].includes(t.latest_outcome)) {
-          badgeClass = "bg-rose-950 text-rose-400 border border-rose-800";
-        } else if (t.latest_outcome === 'edited') {
-          badgeClass = "bg-amber-950 text-amber-400 border border-amber-800";
-        }
+// ────────── Charts ──────────
+function renderCharts(series, days) {
+  const labels = []; const dailyCalls = {}; const dailyIn = {}; const dailyOut = {};
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    const key = d.toISOString().split('T')[0]; labels.push(d.toLocaleDateString('en', {month:'short',day:'numeric'}));
+    dailyCalls[key] = 0; dailyIn[key] = 0; dailyOut[key] = 0;
+  }
+  series.forEach(s => { const k = s.day; if (k in dailyCalls) { dailyCalls[k] += s.calls||0; dailyIn[k] += s.input_tokens||0; dailyOut[k] += s.output_tokens||0; } });
 
-        const dateStr = t.created_at ? new Date(t.created_at).toLocaleTimeString() : '-';
-        const row = document.createElement('tr');
-        row.className = "hover:bg-slate-800/40 transition";
-        row.innerHTML = `
-          <td class="py-3 px-4 font-mono text-xs font-semibold text-slate-200">${t.task_id}</td>
-          <td class="py-3 px-4 text-xs text-slate-400">${t.project || '-'}</td>
-          <td class="py-3 px-4 text-xs text-slate-400">${t.task_type || '-'}</td>
-          <td class="py-3 px-4 text-xs font-semibold text-slate-200">${t.call_count || 0}</td>
-          <td class="py-3 px-4 text-xs font-mono text-slate-300">${t.primary_model || '-'}</td>
-          <td class="py-3 px-4"><span class="px-2 py-0.5 rounded text-[11px] font-medium uppercase ${badgeClass}">${statusText}</span></td>
-          <td class="py-3 px-4 text-xs text-slate-500">${dateStr}</td>
-        `;
-        tbody.appendChild(row);
-      });
-    }
+  const callData = labels.map((_,i) => dailyCalls[Object.keys(dailyCalls)[i]]||0);
+  const inData = labels.map((_,i) => dailyIn[Object.keys(dailyIn)[i]]||0);
+  const outData = labels.map((_,i) => dailyOut[Object.keys(dailyOut)[i]]||0);
 
-    // Modal logic
-    function openAccessModal() {
-      document.getElementById('access-modal').classList.remove('hidden');
-      document.getElementById('access-modal').classList.add('flex');
-    }
+  const chartOpts = { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#94a3b8', font: { size: 10, family: 'Inter' } } } }, scales: { x: { ticks: { color: '#475569', font: { size: 10 } }, grid: { color: 'rgba(30,39,64,0.5)' } }, y: { ticks: { color: '#475569', font: { size: 10 } }, grid: { color: 'rgba(30,39,64,0.5)' } } } };
 
-    function closeAccessModal() {
-      document.getElementById('access-modal').classList.add('hidden');
-      document.getElementById('access-modal').classList.remove('flex');
-    }
+  if (activityChart) activityChart.destroy();
+  const ctx1 = document.getElementById('chart-activity').getContext('2d');
+  activityChart = new Chart(ctx1, { type: 'line', data: { labels, datasets: [{ label: 'Calls', data: callData, borderColor: '#818cf8', backgroundColor: 'rgba(129,140,248,0.1)', fill: true, tension: 0.35, pointRadius: 3, pointBackgroundColor: '#818cf8', borderWidth: 2 }] }, options: chartOpts });
 
-    function switchModalTab(tab) {
-      if (tab === 'dev') {
-        document.getElementById('tab-btn-dev').className = "py-2 rounded-md bg-indigo-600 text-white transition";
-        document.getElementById('tab-btn-admin').className = "py-2 rounded-md text-slate-400 hover:text-white transition";
-        document.getElementById('modal-tab-dev').classList.remove('hidden');
-        document.getElementById('modal-tab-admin').classList.add('hidden');
-      } else {
-        document.getElementById('tab-btn-dev').className = "py-2 rounded-md text-slate-400 hover:text-white transition";
-        document.getElementById('tab-btn-admin').className = "py-2 rounded-md bg-violet-600 text-white transition";
-        document.getElementById('modal-tab-dev').classList.add('hidden');
-        document.getElementById('modal-tab-admin').classList.remove('hidden');
-      }
-    }
+  if (tokenChart) tokenChart.destroy();
+  const ctx2 = document.getElementById('chart-tokens').getContext('2d');
+  tokenChart = new Chart(ctx2, { type: 'bar', data: { labels, datasets: [{ label: 'Input', data: inData, backgroundColor: 'rgba(6,182,212,0.5)', borderColor: '#06b6d4', borderWidth: 1, borderRadius: 4 }, { label: 'Output', data: outData, backgroundColor: 'rgba(16,185,129,0.5)', borderColor: '#10b981', borderWidth: 1, borderRadius: 4 }] }, options: { ...chartOpts, scales: { ...chartOpts.scales, x: { ...chartOpts.scales.x, stacked: true }, y: { ...chartOpts.scales.y, stacked: true } } } });
+}
 
-    function submitDeveloperLogin() {
-      const val = document.getElementById('modal-input-user').value.trim() || 'dev';
-      state.role = 'dev';
-      state.user = val;
-      state.adminToken = '';
-      state.filterUser = null;
-      localStorage.setItem('ao_user', val);
-      localStorage.removeItem('ao_admin_token');
-      closeAccessModal();
-      updateUIForRole();
-      fetchData();
-    }
+// ────────── IDE Setup Cards ──────────
+function renderIDECards() {
+  const server = location.origin;
+  const cards = [
+    { icon: '🖥️', name: 'Cursor / VS Code (Continue)', desc: 'Override the OpenAI-compatible base URL in your IDE settings.', code: `Base URL: ${server}/v1\\nModel: gemini-3.1-flash-lite-preview\\nAPI Key: <your-personal-key>` },
+    { icon: '🐚', name: 'PowerShell', desc: 'Paste into your terminal to route all OpenAI SDK calls through Observer.', code: `$env:OPENAI_BASE_URL="${server}/v1"\\n$env:OPENAI_API_KEY="<your-key>"\\n$env:X_SESSION_ID="${S.user}"` },
+    { icon: '🐧', name: 'Bash / Zsh', desc: 'Export environment variables in your shell session.', code: `export OPENAI_BASE_URL="${server}/v1"\\nexport OPENAI_API_KEY="<your-key>"\\nexport X_SESSION_ID="${S.user}"` },
+    { icon: '📦', name: 'pip Install (Global CLI)', desc: 'Install the observer CLI package and run activate.', code: `pip install git+https://github.com/baizo7/observer.git\\nobserver activate` },
+  ];
+  const container = document.getElementById('ide-cards');
+  container.innerHTML = '';
+  cards.forEach(c => {
+    const div = document.createElement('div');
+    div.className = 'card p-4 space-y-3 hover:border-indigo-800/40 transition';
+    div.innerHTML = `<div class="flex items-center gap-2"><span class="text-xl">${c.icon}</span><h4 class="text-xs font-bold text-white">${c.name}</h4></div>
+    <p class="text-[11px] text-slate-400">${c.desc}</p>
+    <pre class="bg-surface-950 border border-surface-700 rounded-lg p-3 text-[11px] mono text-cyan-300 whitespace-pre-wrap overflow-x-auto">${c.code}</pre>
+    <button class="copy-btn px-3 py-1.5 bg-surface-800 hover:bg-surface-700 text-indigo-300 rounded-lg text-[11px] font-bold border border-surface-700 transition w-full">📋 Copy to Clipboard</button>`;
+    const btn = div.querySelector('button');
+    btn.onclick = () => copyText(btn, c.code);
+    container.appendChild(div);
+  });
+}
+function copyText(btn, text) {
+  navigator.clipboard.writeText(text);
+  btn.textContent = '✓ Copied!'; btn.classList.add('text-emerald-400');
+  setTimeout(() => { btn.textContent = '📋 Copy to Clipboard'; btn.classList.remove('text-emerald-400'); }, 2000);
+}
 
-    async function submitAdminLogin() {
-      const key = document.getElementById('modal-input-admin-key').value.trim();
-      if (!key) return;
+// ────────── Model Compare ──────────
+function renderCompare() {
+  const grid = document.getElementById('compare-grid');
+  const stats = S.statsCache || [];
+  if (!stats.length) { grid.innerHTML = '<p class="text-xs text-slate-500 col-span-3">No model data available yet.</p>'; return; }
+  grid.innerHTML = '';
+  const sorted = [...stats].sort((a,b) => (b.calls||0) - (a.calls||0));
+  sorted.forEach(m => {
+    const ot = (m.passes||0)+(m.fails||0); const rate = ot > 0 ? Math.round((m.passes/ot)*100) : null;
+    const cost = estimateCost(m.model, m.input_tokens, m.output_tokens);
+    const efficiency = (m.calls||0) > 0 ? Math.round(((m.output_tokens||0) / (m.calls||0))) : 0;
+    const rc = rate >= 70 ? 'text-emerald-400' : rate >= 40 ? 'text-amber-400' : 'text-slate-500';
+    const ringPct = rate !== null ? rate : 0;
+    const div = document.createElement('div');
+    div.className = 'card p-4 space-y-3 hover:border-indigo-800/40 transition';
+    div.innerHTML = `<div class="flex items-center justify-between"><h4 class="mono text-xs font-bold text-white truncate">${m.model}</h4><span class="text-xl font-black ${rc}">${rate!==null?rate+'%':'—'}</span></div>
+    <div class="w-full bg-surface-800 rounded-full h-1.5"><div class="h-1.5 rounded-full ${rate>=70?'bg-emerald-500':rate>=40?'bg-amber-500':'bg-slate-600'}" style="width:${ringPct}%"></div></div>
+    <div class="grid grid-cols-2 gap-2 text-[11px]">
+      <div><span class="text-slate-500">Calls</span><p class="font-bold text-white">${(m.calls||0).toLocaleString()}</p></div>
+      <div><span class="text-slate-500">Avg Latency</span><p class="font-bold text-cyan-400">${m.avg_latency_ms?m.avg_latency_ms+'ms':'—'}</p></div>
+      <div><span class="text-slate-500">Output/Call</span><p class="font-bold text-slate-200">${efficiency} tok</p></div>
+      <div><span class="text-slate-500">Est. Cost</span><p class="font-bold text-amber-400">${fmtCost(cost)}</p></div>
+      <div><span class="text-slate-500">Pass</span><p class="font-bold text-emerald-400">${m.passes||0}</p></div>
+      <div><span class="text-slate-500">Fail</span><p class="font-bold text-rose-400">${m.fails||0}</p></div>
+    </div>`;
+    grid.appendChild(div);
+  });
+  // Recommendation
+  const best = sorted.reduce((a,b) => { const ra = ((a.passes||0)/((a.passes||0)+(a.fails||0)||1))*100; const rb = ((b.passes||0)/((b.passes||0)+(b.fails||0)||1))*100; return ra >= rb && (a.calls||0)>=3 ? a : b; }, sorted[0]);
+  const fastest = sorted.reduce((a,b) => (a.avg_latency_ms||9999) < (b.avg_latency_ms||9999) ? a : b, sorted[0]);
+  const cheapest = sorted.reduce((a,b) => estimateCost(a.model,a.input_tokens,a.output_tokens)/(a.calls||1) < estimateCost(b.model,b.input_tokens,b.output_tokens)/(b.calls||1) ? a : b, sorted[0]);
+  document.getElementById('compare-recommendation').innerHTML = `<div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-[11px]">
+    <div><span class="text-emerald-400 font-bold">Best Pass Rate:</span> <span class="mono text-white font-semibold">${best.model}</span></div>
+    <div><span class="text-cyan-400 font-bold">Lowest Latency:</span> <span class="mono text-white font-semibold">${fastest.model}</span> (${fastest.avg_latency_ms}ms)</div>
+    <div><span class="text-amber-400 font-bold">Most Cost-Efficient:</span> <span class="mono text-white font-semibold">${cheapest.model}</span></div>
+  </div>`;
+}
 
-      // Verify token with backend
-      try {
-        const res = await fetch('/admin/verify', {
-          headers: { 'X-Admin-Token': key, 'Authorization': `Bearer ${key}` }
-        });
-        if (res.ok) {
-          state.role = 'admin';
-          state.adminToken = key;
-          state.filterUser = null;
-          localStorage.setItem('ao_admin_token', key);
-          closeAccessModal();
-          updateUIForRole();
-          fetchData();
-        } else {
-          alert('Invalid Admin Key or Unauthorized.');
-        }
-      } catch (e) {
-        alert('Could not verify admin key: ' + e);
-      }
-    }
+// ────────── Dataset Export ──────────
+function setExportType(t) {
+  S.exportType = t;
+  document.getElementById('btn-sft').className = t==='sft' ? 'flex-1 py-2 rounded-lg text-xs font-bold bg-indigo-600 text-white border border-indigo-500 transition' : 'flex-1 py-2 rounded-lg text-xs font-bold bg-surface-800 text-slate-400 border border-surface-700 transition';
+  document.getElementById('btn-dpo').className = t==='dpo' ? 'flex-1 py-2 rounded-lg text-xs font-bold bg-violet-600 text-white border border-violet-500 transition' : 'flex-1 py-2 rounded-lg text-xs font-bold bg-surface-800 text-slate-400 border border-surface-700 transition';
+  document.getElementById('export-type-desc').textContent = t==='sft' ? 'Supervised Fine-Tuning — ShareGPT format with verified prompt→response pairs.' : 'Direct Preference Optimization — chosen vs rejected pairs for RLHF training.';
+}
+async function runExport() {
+  const btn = document.getElementById('export-run-btn');
+  const status = document.getElementById('export-status');
+  btn.disabled = true; btn.textContent = 'Generating...'; status.textContent = '';
+  const payload = { dataset_type: S.exportType, project: document.getElementById('export-project').value || null, limit: parseInt(document.getElementById('export-limit').value) || 500, deduplicate: true, val_split: 0.2 };
+  try {
+    const r = await fetch('/admin/export-dataset', { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify(payload) });
+    if (!r.ok) { const e = await r.json(); status.textContent = 'Error: ' + (e.error||r.statusText); btn.disabled = false; btn.textContent = 'Generate & Download .jsonl'; return; }
+    const d = await r.json();
+    // Show summary
+    const preview = document.getElementById('export-preview'); preview.classList.remove('hidden');
+    const sumEl = document.getElementById('export-summary-content');
+    const s = d.summary || {};
+    sumEl.innerHTML = `<div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div><span class="text-slate-500">Type</span><p class="font-bold text-white">${d.dataset_type.toUpperCase()}</p></div>
+      <div><span class="text-slate-500">Train</span><p class="font-bold text-emerald-400">${d.splits?.train_count||0} samples</p></div>
+      <div><span class="text-slate-500">Validation</span><p class="font-bold text-cyan-400">${d.splits?.validation_count||0} samples</p></div>
+      <div><span class="text-slate-500">Total Tokens</span><p class="font-bold text-white">${(s.total_tokens||0).toLocaleString()}</p></div>
+    </div>`;
+    // Download as .jsonl
+    const allRecords = [...(d.train||[]), ...(d.validation||[])];
+    const jsonl = allRecords.map(r => JSON.stringify(r)).join('\\n');
+    const blob = new Blob([jsonl], {type:'application/jsonl'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = `observer_${d.dataset_type}_dataset.jsonl`; a.click();
+    URL.revokeObjectURL(url);
+    status.textContent = '✓ Downloaded ' + allRecords.length + ' records.';
+  } catch(e) { status.textContent = 'Error: ' + e; }
+  btn.disabled = false; btn.textContent = 'Generate & Download .jsonl';
+}
 
-    initAuth();
-    fetchData();
-    setInterval(fetchData, 5000);
-  </script>
+// ────────── Modal ──────────
+function openAccessModal() { document.getElementById('access-modal').classList.remove('hidden'); document.getElementById('access-modal').classList.add('flex'); }
+function closeAccessModal() { document.getElementById('access-modal').classList.add('hidden'); document.getElementById('access-modal').classList.remove('flex'); }
+function switchModalTab(t) {
+  document.getElementById('tab-btn-dev').className = t==='dev' ? "py-2 rounded-md bg-indigo-600 text-white transition" : "py-2 rounded-md text-slate-400 hover:text-white transition";
+  document.getElementById('tab-btn-admin').className = t==='admin' ? "py-2 rounded-md bg-violet-600 text-white transition" : "py-2 rounded-md text-slate-400 hover:text-white transition";
+  document.getElementById('modal-tab-dev').classList.toggle('hidden', t!=='dev');
+  document.getElementById('modal-tab-admin').classList.toggle('hidden', t!=='admin');
+}
+function submitDeveloperLogin() {
+  S.user = document.getElementById('modal-input-user').value.trim() || 'dev';
+  S.role = 'dev'; S.adminToken = ''; S.filterUser = null;
+  localStorage.setItem('ao_user', S.user); localStorage.removeItem('ao_admin_token');
+  closeAccessModal(); updateUIForRole(); fetchData();
+}
+async function submitAdminLogin() {
+  const key = document.getElementById('modal-input-admin-key').value.trim(); if (!key) return;
+  try {
+    const r = await fetch('/admin/verify', { headers: { 'X-Admin-Token': key, 'Authorization': 'Bearer '+key } });
+    if (r.ok) { S.role='admin'; S.adminToken=key; S.filterUser=null; localStorage.setItem('ao_admin_token',key); closeAccessModal(); updateUIForRole(); fetchData(); }
+    else alert('Invalid Admin Key.');
+  } catch(e) { alert('Error: '+e); }
+}
+
+// ────────── Boot ──────────
+initAuth(); fetchData(); setInterval(fetchData, 8000);
+</script>
 </body>
 </html>
 """

@@ -323,3 +323,37 @@ async def fetch_developer_profile(pool: asyncpg.Pool, session_id: str) -> Dict[s
             "total_calls": 0,
         }
 
+
+async def fetch_timeseries_stats(
+    pool: asyncpg.Pool,
+    days: int = 7,
+    session_id: Optional[str] = None,
+    project: Optional[str] = None,
+) -> List[Dict[str, Any]]:
+    """Fetch daily aggregated call metrics for time-series charting."""
+    async with pool.acquire() as c:
+        rows = await c.fetch("""
+            SELECT
+                date_trunc('day', ts)::date AS day,
+                model,
+                count(*) AS calls,
+                round(avg(latency_ms)) AS avg_latency_ms,
+                COALESCE(sum(input_tokens), 0) AS input_tokens,
+                COALESCE(sum(output_tokens), 0) AS output_tokens
+            FROM llm_calls
+            WHERE ts >= now() - make_interval(days => $1)
+              AND ($2::text IS NULL OR session_id = $2)
+              AND ($3::text IS NULL OR project = $3)
+            GROUP BY day, model
+            ORDER BY day ASC, calls DESC
+        """, days, session_id, project)
+    result = []
+    for r in rows:
+        d = dict(r)
+        if hasattr(d.get("day"), "isoformat"):
+            d["day"] = d["day"].isoformat()
+        elif d.get("day") is not None:
+            d["day"] = str(d["day"])
+        result.append(d)
+    return result
+

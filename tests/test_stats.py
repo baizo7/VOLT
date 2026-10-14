@@ -53,3 +53,41 @@ def test_stats_query_contains_distinct_attribution():
     source = inspect.getsource(main.stats)
     assert "DISTINCT ON (task_id)" in source
     assert "task_primary_model" in source
+
+
+@pytest.mark.asyncio
+async def test_stats_timeseries_endpoint(async_client, monkeypatch):
+    mock_pool = MagicMock()
+    mock_conn = MagicMock()
+    mock_conn.fetch = AsyncMock(return_value=[
+        {
+            "day": "2026-10-14",
+            "model": "gpt-4o",
+            "calls": 25,
+            "avg_latency_ms": 320,
+            "input_tokens": 5000,
+            "output_tokens": 1500,
+        }
+    ])
+    mock_acquire = MagicMock()
+    mock_acquire.__aenter__.return_value = mock_conn
+    mock_acquire.__aexit__ = AsyncMock(return_value=None)
+    mock_pool.acquire.return_value = mock_acquire
+
+    monkeypatch.setattr(main, "pool", mock_pool)
+
+    # Valid request
+    resp = await async_client.get("/stats/timeseries?days=7")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["ok"] is True
+    assert data["days"] == 7
+    assert len(data["series"]) == 1
+    assert data["series"][0]["model"] == "gpt-4o"
+
+    # Invalid days (< 1 or > 365)
+    resp_low = await async_client.get("/stats/timeseries?days=0")
+    assert resp_low.status_code == 400
+    resp_high = await async_client.get("/stats/timeseries?days=400")
+    assert resp_high.status_code == 400
+

@@ -81,6 +81,7 @@ from app.storage import (
     check_health,
     fetch_connected_developers,
     fetch_developer_profile,
+    fetch_timeseries_stats,
     fetch_stats,
     fetch_task_details,
     fetch_tasks,
@@ -995,6 +996,19 @@ async def user_profile_endpoint(request: Request, user: Optional[str] = None):
         return JSONResponse({"error": "user parameter or X-Session-Id header required"}, status_code=400)
     profile = await fetch_developer_profile(pool, target_user)
     return {"ok": True, "profile": profile}
+
+
+@app.get("/stats/timeseries")
+async def stats_timeseries(request: Request, days: int = 7, session_id: Optional[str] = None, project: Optional[str] = None):
+    """Daily aggregated call metrics for dashboard time-series charts."""
+    if not check_auth(request):
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    if pool is None:
+        return JSONResponse({"error": "database uninitialized"}, status_code=503)
+    if days < 1 or days > 365:
+        return JSONResponse({"error": "days must be between 1 and 365"}, status_code=400)
+    data = await fetch_timeseries_stats(pool, days=days, session_id=session_id, project=project)
+    return {"ok": True, "days": days, "series": data}
 
 
 # ---------- admin & retention ----------
