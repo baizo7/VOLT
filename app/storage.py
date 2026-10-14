@@ -89,26 +89,45 @@ async def fetch_stats(pool: asyncpg.Pool) -> List[Dict[str, Any]]:
     return [dict(r) for r in rows]
 
 
-async def fetch_tasks(pool: asyncpg.Pool, limit: int = 50) -> List[Dict[str, Any]]:
-    """Fetch recent tasks summary."""
+async def fetch_tasks(pool: asyncpg.Pool, limit: int = 50, session_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    """Fetch recent tasks summary, optionally filtered to a specific developer session."""
     async with pool.acquire() as c:
-        rows = await c.fetch("""
-            SELECT 
-                t.task_id,
-                t.project,
-                t.task_type,
-                t.title,
-                t.created_at,
-                count(c.id) AS call_count,
-                (SELECT model FROM llm_calls WHERE task_id = t.task_id ORDER BY ts DESC LIMIT 1) AS primary_model,
-                (SELECT status FROM outcomes WHERE task_id = t.task_id ORDER BY created_at DESC LIMIT 1) AS latest_outcome,
-                (SELECT kind FROM outcomes WHERE task_id = t.task_id ORDER BY created_at DESC LIMIT 1) AS outcome_kind
-            FROM tasks t
-            LEFT JOIN llm_calls c ON c.task_id = t.task_id
-            GROUP BY t.task_id, t.project, t.task_type, t.title, t.created_at
-            ORDER BY t.created_at DESC
-            LIMIT $1
-        """, limit)
+        if session_id:
+            rows = await c.fetch("""
+                SELECT 
+                    t.task_id,
+                    t.project,
+                    t.task_type,
+                    t.title,
+                    t.created_at,
+                    count(c.id) AS call_count,
+                    (SELECT model FROM llm_calls WHERE task_id = t.task_id ORDER BY ts DESC LIMIT 1) AS primary_model,
+                    (SELECT status FROM outcomes WHERE task_id = t.task_id ORDER BY created_at DESC LIMIT 1) AS latest_outcome,
+                    (SELECT kind FROM outcomes WHERE task_id = t.task_id ORDER BY created_at DESC LIMIT 1) AS outcome_kind
+                FROM tasks t
+                JOIN llm_calls c ON c.task_id = t.task_id AND c.session_id = $2
+                GROUP BY t.task_id, t.project, t.task_type, t.title, t.created_at
+                ORDER BY t.created_at DESC
+                LIMIT $1
+            """, limit, session_id)
+        else:
+            rows = await c.fetch("""
+                SELECT 
+                    t.task_id,
+                    t.project,
+                    t.task_type,
+                    t.title,
+                    t.created_at,
+                    count(c.id) AS call_count,
+                    (SELECT model FROM llm_calls WHERE task_id = t.task_id ORDER BY ts DESC LIMIT 1) AS primary_model,
+                    (SELECT status FROM outcomes WHERE task_id = t.task_id ORDER BY created_at DESC LIMIT 1) AS latest_outcome,
+                    (SELECT kind FROM outcomes WHERE task_id = t.task_id ORDER BY created_at DESC LIMIT 1) AS outcome_kind
+                FROM tasks t
+                LEFT JOIN llm_calls c ON c.task_id = t.task_id
+                GROUP BY t.task_id, t.project, t.task_type, t.title, t.created_at
+                ORDER BY t.created_at DESC
+                LIMIT $1
+            """, limit)
     result = []
     for r in rows:
         d = dict(r)
@@ -186,3 +205,121 @@ async def check_health(pool: Optional[asyncpg.Pool]) -> bool:
     except Exception as e:
         logger.warning(f"Health check query error: {e}")
         return False
+
+
+async def record_developer_key(
+    pool: Optional[asyncpg.Pool],
+    key_hash: str,
+    session_id: Optional[str],
+    project: Optional[str],
+    key_masked: str,
+    provider: str,
+    model: str,
+):
+    """Upsert developer connection record tracking their masked key and configured models."""
+    if pool is None or not key_hash or key_hash == "anonymous":
+        return
+    try:
+        async with pool.acquire() as c:
+            await c.execute("""
+                INSERT INTO developer_keys (key_hash, session_id, project, key_masked, provider, models_used, first_seen, last_seen, total_calls)
+                VALUES ($1, $2, $3, $4, $5, ARRAY[$6::text], now(), now(), 1)
+                ON CONFLICT (key_hash) DO UPDATE SET
+                    session_id = COALESCE(EXCLUDED.session_id, developer_keys.session_id),
+                    project = COALESCE(EXCLUDED.project, developer_keys.project),
+                    provider = COALESCE(EXCLUDED.provider, developer_keys.provider),
+                    last_seen = now(),
+                    total_calls = developer_keys.total_calls + 1,
+                    models_used = (
+                        SELECT array_agg(DISTINCT m)
+                        FROM unnest(array_append(developer_keys.models_used, EXCLUDED.models_used[1])) AS m
+                        WHERE m IS NOT NULL
+                    )
+            """, key_hash, session_id or "anonymous", project or "default", key_masked, provider, model)
+    except Exception as e:
+        logger.warning(f"Failed to record developer key: {e}")
+
+
+async def fetch_connected_developers(pool: asyncpg.Pool) -> List[Dict[str, Any]]:
+    """Fetch list of all developers who connected their API keys, with usage and activity metrics."""
+    async with pool.acquire() as c:
+        rows = await c.fetch("""
+            SELECT 
+                dk.key_hash,
+                COALESCE(dk.session_id, 'anonymous') AS session_id,
+                COALESCE(dk.project, 'default') AS project,
+                dk.key_masked,
+                COALESCE(dk.provider, 'unknown') AS provider,
+                COALESCE(dk.models_used, ARRAY[]::text[]) AS models_used,
+                dk.first_seen,
+                dk.last_seen,
+                dk.total_calls,
+                COALESCE(u.input_tokens, 0) AS total_input_tokens,
+                COALESCE(u.output_tokens, 0) AS total_output_tokens
+            FROM developer_keys dk
+            LEFT JOIN (
+                SELECT session_id, sum(input_tokens) AS input_tokens, sum(output_tokens) AS output_tokens
+                FROM llm_calls
+                GROUP BY session_id
+            ) u ON u.session_id = dk.session_id
+            ORDER BY dk.last_seen DESC
+        """)
+        results = []
+        for r in rows:
+            d = dict(r)
+            if d.get("first_seen"):
+                d["first_seen"] = d["first_seen"].isoformat()
+            if d.get("last_seen"):
+                d["last_seen"] = d["last_seen"].isoformat()
+            results.append(d)
+        return results
+
+
+async def fetch_developer_profile(pool: asyncpg.Pool, session_id: str) -> Dict[str, Any]:
+    """Fetch personal configuration and activity for a single developer."""
+    async with pool.acquire() as c:
+        row = await c.fetchrow("""
+            SELECT 
+                session_id, project, key_masked, provider, models_used, first_seen, last_seen, total_calls
+            FROM developer_keys
+            WHERE session_id = $1
+            ORDER BY last_seen DESC
+            LIMIT 1
+        """, session_id)
+        if row:
+            d = dict(row)
+            if d.get("first_seen"):
+                d["first_seen"] = d["first_seen"].isoformat()
+            if d.get("last_seen"):
+                d["last_seen"] = d["last_seen"].isoformat()
+            return d
+
+        fallback = await c.fetchrow("""
+            SELECT 
+                session_id, project, 'configured' AS key_masked, 'custom' AS provider,
+                array_agg(DISTINCT model) AS models_used,
+                min(ts) AS first_seen, max(ts) AS last_seen, count(*) AS total_calls
+            FROM llm_calls
+            WHERE session_id = $1
+            GROUP BY session_id, project
+            LIMIT 1
+        """, session_id)
+        if fallback:
+            d = dict(fallback)
+            if d.get("first_seen"):
+                d["first_seen"] = d["first_seen"].isoformat()
+            if d.get("last_seen"):
+                d["last_seen"] = d["last_seen"].isoformat()
+            return d
+
+        return {
+            "session_id": session_id,
+            "project": "default",
+            "key_masked": "not-active",
+            "provider": "unknown",
+            "models_used": [],
+            "first_seen": None,
+            "last_seen": None,
+            "total_calls": 0,
+        }
+

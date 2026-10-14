@@ -215,6 +215,16 @@ def cmd_dashboard(args: argparse.Namespace) -> int:
     cfg = load_config()
     server = (args.server or get_server_url(cfg)).rstrip("/")
     url = f"{server}/dashboard"
+    if getattr(args, "admin", False):
+        admin_token = getattr(args, "token", None) or os.environ.get("OBSERVER_ADMIN_KEY") or os.environ.get("ADMIN_TOKEN")
+        if admin_token:
+            url += f"?admin_token={urllib.parse.quote(admin_token)}"
+        else:
+            url += "?admin=true"
+    else:
+        user = getattr(args, "user", None) or cfg.get("user")
+        if user:
+            url += f"?user={urllib.parse.quote(user)}"
     print(f"[+] Opening AI Observer Dashboard: {url}")
     try:
         webbrowser.open(url)
@@ -311,6 +321,9 @@ def main() -> int:
     # dashboard
     p_dash = subparsers.add_parser("dashboard", help="Open visual web dashboard in browser")
     p_dash.add_argument("--server", help="Observer server URL")
+    p_dash.add_argument("--user", help="Developer username to view scoped personal dashboard")
+    p_dash.add_argument("--admin", action="store_true", help="Open in Admin mode with full system visibility")
+    p_dash.add_argument("--token", help="Admin secret token")
 
     # test
     p_test = subparsers.add_parser("test", help="Test connection and model response through proxy")

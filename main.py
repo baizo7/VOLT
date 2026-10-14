@@ -69,17 +69,23 @@ from app.routing import load_routes
 from app.routing import resolve_route as _resolve_route
 from app.security import (
     SECRET_PATTERNS,
+    check_admin_auth,
     check_auth,
+    hash_api_key,
+    mask_api_key,
     scrub_json,
     scrub_record,
     scrub_text,
 )
 from app.storage import (
     check_health,
+    fetch_connected_developers,
+    fetch_developer_profile,
     fetch_stats,
     fetch_task_details,
     fetch_tasks,
     prune_records,
+    record_developer_key,
     record_outcome,
     save_llm_call,
 )
@@ -364,6 +370,40 @@ async def proxy(request: Request, style: str, project: str = None):
         if request.headers.get("x-api-key") == observer_token:
             headers.pop("x-api-key", None)
 
+    dev_raw_key = client_auth or request.headers.get("x-api-key", "").strip()
+    if dev_raw_key.lower().startswith("bearer "):
+        dev_raw_key = dev_raw_key[7:].strip()
+    k_masked = mask_api_key(dev_raw_key)
+    k_hash = hash_api_key(dev_raw_key)
+
+    provider = "custom"
+    lower_key = dev_raw_key.lower()
+    if "aiza" in lower_key:
+        provider = "gemini"
+    elif "sk-ant" in lower_key:
+        provider = "anthropic"
+    elif "sk-" in lower_key:
+        provider = "openai"
+    elif "nvapi-" in lower_key:
+        provider = "nvidia"
+    elif "deepseek" in route.get("base_url", "").lower():
+        provider = "deepseek"
+
+    dev_session = request.headers.get("x-session-id") or request.headers.get("x-user") or request.headers.get("user")
+    if pool is not None and k_hash != "anonymous":
+        try:
+            await record_developer_key(
+                pool=pool,
+                key_hash=k_hash,
+                session_id=dev_session,
+                project=effective_project,
+                key_masked=k_masked,
+                provider=provider,
+                model=model,
+            )
+        except Exception as k_err:
+            logger.warning(f"Failed to record developer key: {k_err}")
+
     key = os.environ.get(route.get("api_key_env") or "")
     if key:  # proxy-held key replaces the client's
         headers.pop("authorization", None)
@@ -374,7 +414,7 @@ async def proxy(request: Request, style: str, project: str = None):
         "id": str(uuid.uuid4()),
         "project": effective_project,
         "task_id": request.headers.get("x-task-id"),
-        "session_id": request.headers.get("x-session-id"),
+        "session_id": dev_session,
         "task_type": request.headers.get("x-task-type"),
         "model": model,
         "upstream": route["base_url"],
@@ -757,8 +797,25 @@ async def stats(request: Request, session_id: Optional[str] = None, project: Opt
     """Per-model summary with last-touch attribution and task-level success metric."""
     if not check_auth(request):
         return JSONResponse({"error": "unauthorized"}, status_code=401)
+
+    is_admin = check_admin_auth(request)
+    dev_session = session_id or request.headers.get("x-session-id") or request.headers.get("x-user")
+
+    # If requester is not admin, enforce user isolation: they only see their own usage
+    effective_session = session_id
+    if not is_admin:
+        effective_session = dev_session
+        if not effective_session:
+            if os.environ.get("OBSERVER_ADMIN_KEY") or os.environ.get("OBSERVER_AUTH_TOKEN"):
+                return JSONResponse(
+                    {"error": "unauthorized: admin privileges or developer session_id required"},
+                    status_code=401
+                )
+            effective_session = session_id
+
     if pool is None:
         return JSONResponse({"error": "database uninitialized"}, status_code=503)
+
     async with pool.acquire() as c:
         rows = await c.fetch("""
             WITH filtered_calls AS (
@@ -798,7 +855,7 @@ async def stats(request: Request, session_id: Optional[str] = None, project: Opt
                 JOIN task_outcome_summary tos ON tos.task_id = tpm.task_id
                 GROUP BY tpm.model
             ) o ON o.model = m.model
-            ORDER BY m.calls DESC""", session_id, project)
+            ORDER BY m.calls DESC""", effective_session, project)
     return [dict(r) for r in rows]
 
 
@@ -881,12 +938,17 @@ async def router_recommendations_endpoint(request: Request):
 
 # ---------- task audit endpoints ----------
 @app.get("/tasks")
-async def list_tasks(request: Request, limit: int = 50):
+async def list_tasks(request: Request, limit: int = 50, session_id: Optional[str] = None):
     if not check_auth(request):
         return JSONResponse({"error": "unauthorized"}, status_code=401)
     if pool is None:
         return JSONResponse({"error": "database uninitialized"}, status_code=503)
-    return await fetch_tasks(pool, limit)
+
+    is_admin = check_admin_auth(request)
+    dev_session = session_id or request.headers.get("x-session-id") or request.headers.get("x-user")
+    effective_session = session_id if is_admin else dev_session
+
+    return await fetch_tasks(pool, limit, session_id=effective_session)
 
 
 @app.get("/tasks/{task_id}")
@@ -901,11 +963,45 @@ async def get_task_trace(task_id: str, request: Request):
     return data
 
 
+# ---------- admin & developer access endpoints ----------
+@app.get("/admin/connected-users")
+async def admin_connected_users_endpoint(request: Request):
+    """Admin endpoint to view all developers who connected their API keys."""
+    if not check_admin_auth(request):
+        return JSONResponse({"error": "unauthorized: admin privileges required"}, status_code=401)
+    if pool is None:
+        return JSONResponse({"error": "database uninitialized"}, status_code=503)
+    users = await fetch_connected_developers(pool)
+    return {"ok": True, "users": users}
+
+
+@app.get("/admin/verify")
+async def admin_verify_endpoint(request: Request):
+    """Verify admin authorization status."""
+    if not check_admin_auth(request):
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    return {"ok": True, "role": "admin"}
+
+
+@app.get("/user/profile")
+async def user_profile_endpoint(request: Request, user: Optional[str] = None):
+    """User endpoint to view their own configured API key (masked) and models."""
+    if not check_auth(request):
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    if pool is None:
+        return JSONResponse({"error": "database uninitialized"}, status_code=503)
+    target_user = user or request.headers.get("x-session-id") or request.headers.get("x-user")
+    if not target_user:
+        return JSONResponse({"error": "user parameter or X-Session-Id header required"}, status_code=400)
+    profile = await fetch_developer_profile(pool, target_user)
+    return {"ok": True, "profile": profile}
+
+
 # ---------- admin & retention ----------
 @app.post("/admin/prune")
 async def prune_endpoint(request: Request, days: int = 90):
-    if not check_auth(request):
-        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    if not check_admin_auth(request):
+        return JSONResponse({"error": "unauthorized: admin privileges required"}, status_code=401)
     if pool is None:
         return JSONResponse({"error": "database uninitialized"}, status_code=503)
     if days < 1 or days > 3650:
@@ -918,8 +1014,8 @@ async def prune_endpoint(request: Request, days: int = 90):
 @app.post("/admin/export-dataset")
 async def export_dataset_endpoint(payload: DatasetExportRequest, request: Request):
     """Export curated SFT or DPO datasets from verified task telemetry."""
-    if not check_auth(request):
-        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    if not check_admin_auth(request):
+        return JSONResponse({"error": "unauthorized: admin privileges required"}, status_code=401)
     if pool is None:
         return JSONResponse({"error": "database uninitialized"}, status_code=503)
 

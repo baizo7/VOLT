@@ -60,3 +60,18 @@ CREATE TABLE IF NOT EXISTS solutions (
 CREATE INDEX IF NOT EXISTS solutions_task_idx ON solutions (task_id);
 CREATE INDEX IF NOT EXISTS solutions_embedding_idx ON solutions USING hnsw (embedding vector_cosine_ops);
 
+-- Phase 6: Connected developer keys and access tracking
+CREATE TABLE IF NOT EXISTS developer_keys (
+    key_hash       TEXT PRIMARY KEY,
+    session_id     TEXT,
+    project        TEXT,
+    key_masked     TEXT NOT NULL,
+    provider       TEXT,
+    models_used    TEXT[],
+    first_seen     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    last_seen      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    total_calls    INT DEFAULT 1
+);
+CREATE INDEX IF NOT EXISTS developer_keys_session_idx ON developer_keys (session_id);
+
+

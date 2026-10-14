@@ -1,3 +1,4 @@
+import hashlib
 import logging
 import os
 import re
@@ -97,3 +98,78 @@ def check_auth(request: Request) -> bool:
         return True
 
     return False
+
+
+def mask_api_key(key: Optional[str]) -> str:
+    """
+    Safely mask an API key for identification without exposing secret credentials.
+    Example: 'AIzaSyBC1234567890abcdef1234567890' -> 'AIzaSy...7890'
+    """
+    if not key or not isinstance(key, str):
+        return "not-configured"
+    clean = key.strip()
+    if clean.lower().startswith("bearer "):
+        clean = clean[7:].strip()
+    if not clean or clean in ("none", "test", "test-key"):
+        return "not-configured"
+    if len(clean) <= 10:
+        return clean[:2] + "••••" + clean[-2:]
+    return f"{clean[:6]}...{clean[-4:]}"
+
+
+def hash_api_key(key: Optional[str]) -> str:
+    """Deterministic hash of API key for safe indexing and collision matching."""
+    if not key or not isinstance(key, str):
+        return "anonymous"
+    clean = key.strip()
+    if clean.lower().startswith("bearer "):
+        clean = clean[7:].strip()
+    if not clean:
+        return "anonymous"
+    return hashlib.sha256(clean.encode("utf-8")).hexdigest()[:16]
+
+
+def check_admin_auth(request: Request) -> bool:
+    """
+    Verify whether the incoming request has valid Administrator access.
+    Checks against OBSERVER_ADMIN_KEY, OBSERVER_ADMIN_TOKEN, or fallback OBSERVER_AUTH_TOKEN.
+    """
+    admin_key = (
+        os.environ.get("OBSERVER_ADMIN_KEY")
+        or os.environ.get("OBSERVER_ADMIN_TOKEN")
+        or os.environ.get("OBSERVER_AUTH_TOKEN")
+    )
+    if not admin_key:
+        # When unconfigured in local development/tests, default to open admin if REQUIRE_AUTH is false
+        return os.environ.get("REQUIRE_AUTH", "").lower() not in ("true", "1")
+
+    # Candidate 1: X-Admin-Token header
+    admin_header = request.headers.get("x-admin-token", "").strip()
+    if admin_header and secrets.compare_digest(admin_header, admin_key):
+        return True
+
+    # Candidate 2: Authorization header
+    auth_header = request.headers.get("authorization", "").strip()
+    if auth_header:
+        parts = auth_header.split(None, 1)
+        if len(parts) == 2 and parts[0].lower() == "bearer" and secrets.compare_digest(parts[1], admin_key):
+            return True
+        if secrets.compare_digest(auth_header, admin_key):
+            return True
+
+    # Candidate 3: X-Observer-Token
+    obs_token = request.headers.get("x-observer-token", "").strip()
+    if obs_token and secrets.compare_digest(obs_token, admin_key):
+        return True
+
+    # Candidate 4: Query parameter ?admin_token=... or ?token=...
+    q_admin = request.query_params.get("admin_token", "").strip()
+    if q_admin and secrets.compare_digest(q_admin, admin_key):
+        return True
+
+    q_token = request.query_params.get("token", "").strip()
+    if q_token and secrets.compare_digest(q_token, admin_key):
+        return True
+
+    return False
+
