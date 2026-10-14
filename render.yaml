@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: ai-observer
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: ROUTES_FILE
+        value: routes.json
+      - key: MAX_STORED_CHARS
+        value: "200000"

@@ -130,7 +130,27 @@ client: Optional[httpx.AsyncClient] = None
 async def lifespan(app):
     global pool, client, routes
     try:
-        pool = await asyncpg.create_pool(DATABASE_URL, min_size=1, max_size=5)
+        clean_db_url = DATABASE_URL
+        ssl_ctx = None
+        if "sslmode=" in clean_db_url:
+            clean_db_url = clean_db_url.split("?sslmode=")[0].split("&sslmode=")[0]
+            ssl_ctx = "require"
+        elif clean_db_url and "localhost" not in clean_db_url and "127.0.0.1" not in clean_db_url:
+            ssl_ctx = "require"
+
+        pool = await asyncpg.create_pool(clean_db_url, min_size=1, max_size=10, ssl=ssl_ctx)
+
+        # Idempotently apply schema.sql so cloud databases (Supabase/Neon) are initialized automatically
+        schema_path = os.path.join(os.path.dirname(__file__), "schema.sql")
+        if os.path.exists(schema_path):
+            try:
+                with open(schema_path, "r", encoding="utf-8") as f:
+                    schema_content = f.read()
+                async with pool.acquire() as conn:
+                    await conn.execute(schema_content)
+                logger.info("Database schema verified and applied.")
+            except Exception as schema_err:
+                logger.warning(f"Schema initialization notice: {schema_err}")
     except Exception as e:
         logger.error(f"Failed to connect to database: {e}")
         pool = None
