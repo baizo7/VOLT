@@ -75,100 +75,123 @@ DASHBOARD_HTML = """<!DOCTYPE html>
   </div>
 </header>
 
-<main class="flex-1 max-w-[1440px] w-full mx-auto px-4 md:px-6 py-5 space-y-5">
+<main class="flex-1 max-w-[1440px] w-full mx-auto px-4 md:px-6 py-4 space-y-3.5">
 
 <!-- ========== DEVELOPER PROFILE BANNER ========== -->
-<section id="developer-banner" class="hidden card p-4 flex flex-wrap items-center justify-between gap-3 border-indigo-900/40 bg-gradient-to-r from-surface-900 to-indigo-950/30 fade-in">
-  <div class="flex items-center gap-3">
-    <div class="h-10 w-10 rounded-xl bg-indigo-500/15 text-indigo-400 flex items-center justify-center text-lg border border-indigo-500/25">👤</div>
+<section id="developer-banner" class="hidden card px-3.5 py-2 flex flex-wrap items-center justify-between gap-2.5 border-indigo-900/30 bg-gradient-to-r from-surface-900 to-indigo-950/20 fade-in">
+  <div class="flex items-center gap-2.5">
+    <div class="h-8 w-8 rounded-lg bg-indigo-500/15 text-indigo-400 flex items-center justify-center text-sm border border-indigo-500/25">👤</div>
     <div>
-      <p class="text-xs font-semibold uppercase tracking-wider text-indigo-400">Personal Dashboard</p>
-      <p class="text-sm font-bold text-white" id="banner-user-name">dev</p>
+      <p class="text-[10px] font-bold uppercase tracking-wider text-indigo-400">Personal Dashboard</p>
+      <p class="text-xs font-bold text-white leading-tight" id="banner-user-name">dev</p>
     </div>
   </div>
-  <div class="flex items-center gap-3 text-[11px]">
-    <div class="bg-surface-950/60 px-3 py-1.5 rounded-lg border border-surface-700"><span class="text-slate-400">Key:</span> <span id="banner-masked-key" class="mono text-cyan-400 font-semibold ml-0.5">•••</span></div>
-    <div class="bg-surface-950/60 px-3 py-1.5 rounded-lg border border-surface-700"><span class="text-slate-400">Provider:</span> <span id="banner-provider" class="uppercase font-semibold text-slate-200 ml-0.5">—</span></div>
+  <div class="flex items-center gap-2 text-[10px]">
+    <div class="bg-surface-950/60 px-2.5 py-1 rounded-md border border-surface-700/70"><span class="text-slate-400">Key:</span> <span id="banner-masked-key" class="mono text-cyan-400 font-semibold ml-0.5">•••</span></div>
+    <div class="bg-surface-950/60 px-2.5 py-1 rounded-md border border-surface-700/70"><span class="text-slate-400">Provider:</span> <span id="banner-provider" class="uppercase font-semibold text-slate-200 ml-0.5">—</span></div>
   </div>
 </section>
 
 <!-- ========== METRICS GRID ========== -->
-<section class="grid grid-cols-2 lg:grid-cols-4 gap-3">
-  <div class="card card-glow p-4 metric-gradient-1">
-    <span class="text-[10px] text-indigo-300/80 uppercase tracking-widest font-bold">Total Calls</span>
-    <p id="total-calls" class="text-2xl font-extrabold text-white mt-1">—</p>
-    <span id="total-calls-sub" class="text-[10px] text-slate-500">Proxied LLM traces</span>
+<section class="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+  <div class="card card-glow px-3.5 py-2.5 metric-gradient-1">
+    <span class="text-[10px] text-indigo-300/80 uppercase tracking-wider font-bold">Total Calls</span>
+    <p id="total-calls" class="text-xl font-bold text-white mt-0.5">—</p>
+    <span id="total-calls-sub" class="text-[10px] text-slate-500">Proxied traces</span>
   </div>
-  <div class="card card-glow p-4 metric-gradient-2">
-    <span class="text-[10px] text-cyan-300/80 uppercase tracking-widest font-bold">Avg Latency</span>
-    <p id="avg-latency" class="text-2xl font-extrabold text-cyan-400 mt-1">—</p>
-    <span class="text-[10px] text-slate-500">Milliseconds / call</span>
+  <div class="card card-glow px-3.5 py-2.5 metric-gradient-2">
+    <span class="text-[10px] text-cyan-300/80 uppercase tracking-wider font-bold">Avg Latency</span>
+    <p id="avg-latency" class="text-xl font-bold text-cyan-400 mt-0.5">—</p>
+    <span class="text-[10px] text-slate-500">Ms / call</span>
   </div>
-  <div class="card card-glow p-4 metric-gradient-3">
-    <span class="text-[10px] text-emerald-300/80 uppercase tracking-widest font-bold">Total Tokens</span>
-    <p id="total-tokens" class="text-2xl font-extrabold text-emerald-400 mt-1">—</p>
+  <div class="card card-glow px-3.5 py-2.5 metric-gradient-3">
+    <span class="text-[10px] text-emerald-300/80 uppercase tracking-wider font-bold">Total Tokens</span>
+    <p id="total-tokens" class="text-xl font-bold text-emerald-400 mt-0.5">—</p>
     <span id="token-split" class="text-[10px] text-slate-500">In: — | Out: —</span>
   </div>
-  <div class="card card-glow p-4 metric-gradient-4">
-    <span class="text-[10px] text-amber-300/80 uppercase tracking-widest font-bold">Est. Cost</span>
-    <p id="est-cost" class="text-2xl font-extrabold text-amber-400 mt-1">—</p>
-    <span id="cost-detail" class="text-[10px] text-slate-500">Based on public pricing</span>
+  <div class="card card-glow px-3.5 py-2.5 metric-gradient-4">
+    <span class="text-[10px] text-amber-300/80 uppercase tracking-wider font-bold">Est. Cost</span>
+    <p id="est-cost" class="text-xl font-bold text-amber-400 mt-0.5">—</p>
+    <span id="cost-detail" class="text-[10px] text-slate-500">Public pricing</span>
   </div>
 </section>
 
 <!-- ========== TAB NAVIGATION ========== -->
-<nav class="flex flex-wrap gap-1.5 bg-surface-950 p-1 rounded-xl border border-surface-700">
-  <button onclick="switchTab('overview')"   id="tab-overview"   class="tab-active   px-4 py-2 text-xs font-semibold rounded-lg transition-all">📊 Overview</button>
-  <button onclick="switchTab('traces')"     id="tab-traces"     class="tab-inactive px-4 py-2 text-xs font-semibold rounded-lg transition-all">🔍 Trace Explorer</button>
-  <button onclick="switchTab('export')"     id="tab-export"     class="tab-inactive px-4 py-2 text-xs font-semibold rounded-lg transition-all" style="display:none">📦 Dataset Export</button>
-  <button onclick="switchTab('setup')"      id="tab-setup"      class="tab-inactive px-4 py-2 text-xs font-semibold rounded-lg transition-all">⚡ IDE Setup</button>
-  <button onclick="switchTab('compare')"    id="tab-compare"    class="tab-inactive px-4 py-2 text-xs font-semibold rounded-lg transition-all">🏆 Compare Models</button>
+<nav class="flex flex-wrap gap-1 bg-surface-950 p-1 rounded-xl border border-surface-700/70 text-[11px]">
+  <button onclick="switchTab('overview')"   id="tab-overview"   class="tab-active   px-3.5 py-1.5 font-semibold rounded-lg transition-all">📊 Overview</button>
+  <button onclick="switchTab('traces')"     id="tab-traces"     class="tab-inactive px-3.5 py-1.5 font-semibold rounded-lg transition-all">🔍 Trace Explorer</button>
+  <button onclick="switchTab('export')"     id="tab-export"     class="tab-inactive px-3.5 py-1.5 font-semibold rounded-lg transition-all" style="display:none">📦 Dataset Export</button>
+  <button onclick="switchTab('setup')"      id="tab-setup"      class="tab-inactive px-3.5 py-1.5 font-semibold rounded-lg transition-all">⚡ IDE Setup</button>
+  <button onclick="switchTab('compare')"    id="tab-compare"    class="tab-inactive px-3.5 py-1.5 font-semibold rounded-lg transition-all">🏆 Compare Models</button>
 </nav>
 
 <!-- ====================== TAB: OVERVIEW ====================== -->
-<div id="panel-overview" class="space-y-5 fade-in">
+<div id="panel-overview" class="space-y-3.5 fade-in">
 
   <!-- ADMIN: Connected Developers -->
   <section id="admin-developers-section" class="hidden card overflow-hidden">
-    <div class="p-4 border-b border-surface-700 flex flex-wrap justify-between items-center gap-2 bg-surface-950/50">
+    <div class="px-4 py-2.5 border-b border-surface-700 flex flex-wrap justify-between items-center gap-2 bg-surface-950/50">
       <div>
-        <h2 class="text-sm font-bold text-violet-400 uppercase tracking-wider flex items-center gap-1.5">👑 Connected Developers</h2>
-        <p class="text-[11px] text-slate-500 mt-0.5">Developers who routed API keys through this Observer instance</p>
+        <h2 class="text-xs font-bold text-violet-400 uppercase tracking-wider flex items-center gap-1.5">👑 Connected Developers</h2>
+        <p class="text-[10px] text-slate-500 mt-0.5">Developers who routed API keys through this Observer instance</p>
       </div>
-      <span id="connected-count" class="text-[11px] px-2.5 py-1 rounded-full bg-violet-950/60 text-violet-300 border border-violet-800/50 font-bold">0 developers</span>
+      <span id="connected-count" class="text-[10px] px-2 py-0.5 rounded-full bg-violet-950/60 text-violet-300 border border-violet-800/50 font-bold">0 developers</span>
     </div>
-    <div class="overflow-x-auto"><table class="w-full text-left text-[13px] text-slate-300"><thead class="bg-surface-950/70 text-[10px] text-slate-500 border-b border-surface-700 uppercase">
-      <tr><th class="py-2.5 px-4">Developer</th><th class="py-2.5 px-4">Project</th><th class="py-2.5 px-4">API Key</th><th class="py-2.5 px-4">Provider</th><th class="py-2.5 px-4">Models</th><th class="py-2.5 px-4">Calls</th><th class="py-2.5 px-4">Tokens</th><th class="py-2.5 px-4">Last Active</th><th class="py-2.5 px-4"></th></tr>
-    </thead><tbody id="developers-body" class="divide-y divide-surface-700"><tr><td colspan="9" class="py-6 text-center text-slate-600 text-xs">Loading...</td></tr></tbody></table></div>
+    <div class="overflow-x-auto"><table class="w-full text-left text-xs text-slate-300"><thead class="bg-surface-950/70 text-[10px] text-slate-500 border-b border-surface-700 uppercase">
+      <tr><th class="py-2 px-3.5">Developer</th><th class="py-2 px-3.5">Project</th><th class="py-2 px-3.5">API Key</th><th class="py-2 px-3.5">Provider</th><th class="py-2 px-3.5">Models</th><th class="py-2 px-3.5">Calls</th><th class="py-2 px-3.5">Tokens</th><th class="py-2 px-3.5">Last Active</th><th class="py-2 px-3.5"></th></tr>
+    </thead><tbody id="developers-body" class="divide-y divide-surface-700"><tr><td colspan="9" class="py-4 text-center text-slate-600 text-xs">Loading...</td></tr></tbody></table></div>
   </section>
 
-  <!-- Charts Row -->
-  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-    <div class="card p-4">
-      <div class="flex justify-between items-center mb-3">
-        <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider">Daily Activity</h3>
-        <select id="chart-range" onchange="fetchTimeseries()" class="text-[11px] bg-surface-800 border border-surface-700 text-slate-300 rounded-lg px-2 py-1 focus:outline-none">
-          <option value="7">Last 7 Days</option><option value="14">Last 14 Days</option><option value="30">Last 30 Days</option>
-        </select>
+  <!-- Sleek Compact Analytics Widget with Graph Tabs -->
+  <section class="card overflow-hidden border border-surface-700/80">
+    <div class="px-3.5 py-2 border-b border-surface-700/60 bg-surface-950/60 flex flex-wrap justify-between items-center gap-2">
+      <div class="flex items-center gap-2.5">
+        <!-- Sub-tabs for Graph Mode -->
+        <div class="inline-flex p-0.5 rounded-lg bg-surface-900 border border-surface-700/70 text-[10px]">
+          <button id="graph-tab-activity" onclick="switchGraphMode('activity')" class="px-2.5 py-1 rounded-md font-bold text-white bg-indigo-600 transition">📈 Calls Activity</button>
+          <button id="graph-tab-tokens"   onclick="switchGraphMode('tokens')"   class="px-2.5 py-1 rounded-md font-semibold text-slate-400 hover:text-white transition">🪙 Tokens</button>
+          <button id="graph-tab-split"    onclick="switchGraphMode('split')"    class="px-2 py-1 rounded-md font-semibold text-slate-400 hover:text-white transition hidden md:inline">⊞ Both</button>
+        </div>
+        <span id="chart-summary-text" class="text-[10px] text-slate-400 hidden sm:inline">Daily calls volume</span>
       </div>
-      <canvas id="chart-activity" height="180"></canvas>
+      <div class="flex items-center gap-2">
+        <!-- Range Selector Pills -->
+        <div class="inline-flex p-0.5 rounded-lg bg-surface-900 border border-surface-700/70 text-[10px] font-semibold">
+          <button onclick="setChartRange(7)"  id="range-7"  class="px-2 py-0.5 rounded text-indigo-300 bg-surface-800 transition font-bold">7D</button>
+          <button onclick="setChartRange(14)" id="range-14" class="px-2 py-0.5 rounded text-slate-400 hover:text-white transition">14D</button>
+          <button onclick="setChartRange(30)" id="range-30" class="px-2 py-0.5 rounded text-slate-400 hover:text-white transition">30D</button>
+        </div>
+        <!-- Collapse/Expand Toggle -->
+        <button onclick="toggleChartCollapse()" id="chart-collapse-btn" title="Toggle Graph Visibility" class="text-slate-400 hover:text-white px-2 py-0.5 rounded hover:bg-surface-800 text-[10px] border border-surface-700/50 transition flex items-center gap-1">
+          <span id="chart-collapse-icon">▾</span>
+          <span id="chart-collapse-label">Fold</span>
+        </button>
+      </div>
     </div>
-    <div class="card p-4">
-      <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider mb-3">Token Distribution</h3>
-      <canvas id="chart-tokens" height="180"></canvas>
+    
+    <!-- Collapsible Chart Body with Fixed Compact Height -->
+    <div id="chart-container-body" class="p-3 transition-all duration-200">
+      <div id="charts-grid" class="grid grid-cols-1 gap-2">
+        <div id="wrapper-activity" class="relative h-36 w-full">
+          <canvas id="chart-activity"></canvas>
+        </div>
+        <div id="wrapper-tokens" class="relative h-36 w-full hidden">
+          <canvas id="chart-tokens"></canvas>
+        </div>
+      </div>
     </div>
-  </div>
+  </section>
 
   <!-- Model Leaderboard -->
   <section class="card overflow-hidden">
-    <div class="p-4 border-b border-surface-700 bg-surface-950/50 flex justify-between items-center">
-      <div><h2 class="text-sm font-bold text-slate-200 uppercase tracking-wider">Model Performance Leaderboard</h2>
-      <p id="leaderboard-sub" class="text-[11px] text-slate-500 mt-0.5">Last-touch outcome attribution</p></div>
+    <div class="px-4 py-2.5 border-b border-surface-700 bg-surface-950/50 flex justify-between items-center">
+      <div><h2 class="text-xs font-bold text-slate-200 uppercase tracking-wider">Model Performance Leaderboard</h2>
+      <p id="leaderboard-sub" class="text-[10px] text-slate-500 mt-0.5">Last-touch outcome attribution</p></div>
       <span id="active-filter" class="text-[11px] text-indigo-400 font-medium cursor-pointer"></span>
     </div>
-    <div class="overflow-x-auto"><table class="w-full text-left text-[13px] text-slate-300"><thead class="bg-surface-950/70 text-[10px] text-slate-500 border-b border-surface-700 uppercase">
-      <tr><th class="py-2.5 px-4">Model</th><th class="py-2.5 px-4">Calls</th><th class="py-2.5 px-4">Avg Latency</th><th class="py-2.5 px-4">In Tokens</th><th class="py-2.5 px-4">Out Tokens</th><th class="py-2.5 px-4">Pass / Fail</th><th class="py-2.5 px-4">Success</th><th class="py-2.5 px-4">Est. Cost</th></tr>
-    </thead><tbody id="models-body" class="divide-y divide-surface-700"><tr><td colspan="8" class="py-6 text-center text-slate-600 text-xs">Loading...</td></tr></tbody></table></div>
+    <div class="overflow-x-auto"><table class="w-full text-left text-xs text-slate-300"><thead class="bg-surface-950/70 text-[10px] text-slate-500 border-b border-surface-700 uppercase">
+      <tr><th class="py-2 px-3.5">Model</th><th class="py-2 px-3.5">Calls</th><th class="py-2 px-3.5">Avg Latency</th><th class="py-2 px-3.5">In Tokens</th><th class="py-2 px-3.5">Out Tokens</th><th class="py-2 px-3.5">Pass / Fail</th><th class="py-2 px-3.5">Success</th><th class="py-2 px-3.5">Est. Cost</th></tr>
+    </thead><tbody id="models-body" class="divide-y divide-surface-700"><tr><td colspan="8" class="py-4 text-center text-slate-600 text-xs">Loading...</td></tr></tbody></table></div>
   </section>
 </div>
 
@@ -356,7 +379,7 @@ function switchTab(t) {
   TABS.forEach(id => {
     document.getElementById('panel-'+id).classList.toggle('hidden', id !== t);
     const btn = document.getElementById('tab-'+id);
-    btn.className = id === t ? 'tab-active px-4 py-2 text-xs font-semibold rounded-lg transition-all' : 'tab-inactive px-4 py-2 text-xs font-semibold rounded-lg transition-all';
+    btn.className = id === t ? 'tab-active px-3.5 py-1.5 font-semibold rounded-lg transition-all' : 'tab-inactive px-3.5 py-1.5 font-semibold rounded-lg transition-all';
     if (id === 'export' && S.role !== 'admin') btn.style.display = 'none';
   });
   if (t === 'setup') renderIDECards();
@@ -399,8 +422,12 @@ async function fetchAdminDevelopers(h) {
 async function fetchUserProfile(u) {
   try { const r = await fetch('/user/profile?user='+encodeURIComponent(u)); if (r.ok) { const d = await r.json(); const p=d.profile||{}; document.getElementById('banner-masked-key').textContent=p.key_masked||'—'; document.getElementById('banner-provider').textContent=(p.provider||'—').toUpperCase(); } } catch(e) {}
 }
+let currentChartDays = 7;
+let currentGraphMode = 'activity';
+let chartCollapsed = false;
+
 async function fetchTimeseries() {
-  const days = document.getElementById('chart-range').value;
+  const days = currentChartDays || 7;
   let q = '?days='+days;
   if (S.role !== 'admin') q += '&session_id='+encodeURIComponent(S.user);
   else if (S.filterUser) q += '&session_id='+encodeURIComponent(S.filterUser);
@@ -543,6 +570,68 @@ async function openTracePanel(taskId) {
 }
 function closeTracePanel() { document.getElementById('trace-panel').classList.add('hidden'); }
 
+// ────────── Graph Modes & Controls ──────────
+function switchGraphMode(mode) {
+  currentGraphMode = mode;
+  const bAct = document.getElementById('graph-tab-activity');
+  const bTok = document.getElementById('graph-tab-tokens');
+  const bSpl = document.getElementById('graph-tab-split');
+  if (bAct) bAct.className = mode === 'activity' ? 'px-2.5 py-1 rounded-md font-bold text-white bg-indigo-600 transition' : 'px-2.5 py-1 rounded-md font-semibold text-slate-400 hover:text-white transition';
+  if (bTok) bTok.className = mode === 'tokens' ? 'px-2.5 py-1 rounded-md font-bold text-white bg-cyan-600 transition' : 'px-2.5 py-1 rounded-md font-semibold text-slate-400 hover:text-white transition';
+  if (bSpl) bSpl.className = mode === 'split' ? 'px-2.5 py-1 rounded-md font-bold text-white bg-violet-600 transition' : 'px-2.5 py-1 rounded-md font-semibold text-slate-400 hover:text-white transition hidden md:inline';
+
+  const wAct = document.getElementById('wrapper-activity');
+  const wTok = document.getElementById('wrapper-tokens');
+  const grid = document.getElementById('charts-grid');
+  const sum = document.getElementById('chart-summary-text');
+
+  if (mode === 'activity') {
+    if (grid) grid.className = 'grid grid-cols-1 gap-2';
+    if (wAct) wAct.classList.remove('hidden');
+    if (wTok) wTok.classList.add('hidden');
+    if (sum) sum.textContent = 'Daily calls volume';
+  } else if (mode === 'tokens') {
+    if (grid) grid.className = 'grid grid-cols-1 gap-2';
+    if (wAct) wAct.classList.add('hidden');
+    if (wTok) wTok.classList.remove('hidden');
+    if (sum) sum.textContent = 'Token breakdown (In/Out)';
+  } else {
+    if (grid) grid.className = 'grid grid-cols-1 md:grid-cols-2 gap-3';
+    if (wAct) wAct.classList.remove('hidden');
+    if (wTok) wTok.classList.remove('hidden');
+    if (sum) sum.textContent = 'Dual telemetry view';
+  }
+  if (activityChart) setTimeout(() => activityChart.resize(), 50);
+  if (tokenChart) setTimeout(() => tokenChart.resize(), 50);
+}
+
+function setChartRange(days) {
+  currentChartDays = days;
+  [7, 14, 30].forEach(d => {
+    const el = document.getElementById('range-' + d);
+    if (el) el.className = d === days ? 'px-2 py-0.5 rounded text-indigo-300 bg-surface-800 transition font-bold' : 'px-2 py-0.5 rounded text-slate-400 hover:text-white transition';
+  });
+  fetchTimeseries();
+}
+
+function toggleChartCollapse() {
+  chartCollapsed = !chartCollapsed;
+  const body = document.getElementById('chart-container-body');
+  const icon = document.getElementById('chart-collapse-icon');
+  const label = document.getElementById('chart-collapse-label');
+  if (chartCollapsed) {
+    body.classList.add('hidden');
+    icon.textContent = '▸';
+    if (label) label.textContent = 'Open';
+  } else {
+    body.classList.remove('hidden');
+    icon.textContent = '▾';
+    if (label) label.textContent = 'Fold';
+    if (activityChart) setTimeout(() => activityChart.resize(), 50);
+    if (tokenChart) setTimeout(() => tokenChart.resize(), 50);
+  }
+}
+
 // ────────── Charts ──────────
 function renderCharts(series, days) {
   const labels = []; const dailyCalls = {}; const dailyIn = {}; const dailyOut = {};
@@ -557,15 +646,81 @@ function renderCharts(series, days) {
   const inData = labels.map((_,i) => dailyIn[Object.keys(dailyIn)[i]]||0);
   const outData = labels.map((_,i) => dailyOut[Object.keys(dailyOut)[i]]||0);
 
-  const chartOpts = { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#94a3b8', font: { size: 10, family: 'Inter' } } } }, scales: { x: { ticks: { color: '#475569', font: { size: 10 } }, grid: { color: 'rgba(30,39,64,0.5)' } }, y: { ticks: { color: '#475569', font: { size: 10 } }, grid: { color: 'rgba(30,39,64,0.5)' } } } };
+  const chartOpts = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        display: true,
+        position: 'top',
+        align: 'end',
+        labels: { color: '#94a3b8', font: { size: 10, family: 'Inter' }, boxWidth: 8, boxHeight: 8, usePointStyle: true, pointStyle: 'circle' }
+      },
+      tooltip: {
+        backgroundColor: 'rgba(15, 20, 36, 0.95)',
+        borderColor: '#1e2740',
+        borderWidth: 1,
+        titleFont: { size: 10, family: 'Inter', weight: 'bold' },
+        bodyFont: { size: 10, family: 'Inter' },
+        padding: 6,
+        cornerRadius: 6
+      }
+    },
+    scales: {
+      x: {
+        ticks: { color: '#64748b', font: { size: 9 } },
+        grid: { display: false }
+      },
+      y: {
+        beginAtZero: true,
+        ticks: { color: '#64748b', font: { size: 9 }, precision: 0 },
+        grid: { color: 'rgba(255,255,255,0.03)' }
+      }
+    }
+  };
 
   if (activityChart) activityChart.destroy();
   const ctx1 = document.getElementById('chart-activity').getContext('2d');
-  activityChart = new Chart(ctx1, { type: 'line', data: { labels, datasets: [{ label: 'Calls', data: callData, borderColor: '#818cf8', backgroundColor: 'rgba(129,140,248,0.1)', fill: true, tension: 0.35, pointRadius: 3, pointBackgroundColor: '#818cf8', borderWidth: 2 }] }, options: chartOpts });
+  activityChart = new Chart(ctx1, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Calls',
+        data: callData,
+        borderColor: '#818cf8',
+        backgroundColor: 'rgba(129,140,248,0.08)',
+        fill: true,
+        tension: 0.3,
+        pointRadius: 2.5,
+        pointHoverRadius: 5,
+        pointBackgroundColor: '#818cf8',
+        borderWidth: 2
+      }]
+    },
+    options: chartOpts
+  });
 
   if (tokenChart) tokenChart.destroy();
   const ctx2 = document.getElementById('chart-tokens').getContext('2d');
-  tokenChart = new Chart(ctx2, { type: 'bar', data: { labels, datasets: [{ label: 'Input', data: inData, backgroundColor: 'rgba(6,182,212,0.5)', borderColor: '#06b6d4', borderWidth: 1, borderRadius: 4 }, { label: 'Output', data: outData, backgroundColor: 'rgba(16,185,129,0.5)', borderColor: '#10b981', borderWidth: 1, borderRadius: 4 }] }, options: { ...chartOpts, scales: { ...chartOpts.scales, x: { ...chartOpts.scales.x, stacked: true }, y: { ...chartOpts.scales.y, stacked: true } } } });
+  tokenChart = new Chart(ctx2, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Input', data: inData, backgroundColor: 'rgba(6,182,212,0.6)', borderColor: '#06b6d4', borderWidth: 1, borderRadius: 3, maxBarThickness: 24 },
+        { label: 'Output', data: outData, backgroundColor: 'rgba(16,185,129,0.6)', borderColor: '#10b981', borderWidth: 1, borderRadius: 3, maxBarThickness: 24 }
+      ]
+    },
+    options: {
+      ...chartOpts,
+      scales: {
+        ...chartOpts.scales,
+        x: { ...chartOpts.scales.x, stacked: true },
+        y: { ...chartOpts.scales.y, stacked: true }
+      }
+    }
+  });
 }
 
 // ────────── IDE Setup Cards ──────────
