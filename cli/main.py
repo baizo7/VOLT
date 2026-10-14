@@ -35,11 +35,14 @@ def save_config(cfg: Dict[str, Any]) -> None:
         json.dump(cfg, f, indent=2)
 
 
+DEFAULT_SERVER = os.environ.get("OBSERVER_SERVER_URL", "https://ai-observer-8wcb.onrender.com")
+
+
 def normalize_url(url: str) -> str:
     """Ensure URL has scheme and trimmed trailing slashes."""
     raw = (url or "").strip().rstrip("/")
     if not raw or raw in ("hi", "test", "hello"):
-        return "http://127.0.0.1:8787"
+        return DEFAULT_SERVER
     if not raw.startswith("http://") and not raw.startswith("https://"):
         return f"http://{raw}"
     return raw
@@ -50,7 +53,7 @@ def get_server_url(cfg: Dict[str, Any]) -> str:
     return normalize_url(
         os.environ.get("OBSERVER_SERVER_URL")
         or cfg.get("server_url")
-        or "http://127.0.0.1:8787"
+        or DEFAULT_SERVER
     )
 
 
@@ -58,7 +61,7 @@ def cmd_activate(args: argparse.Namespace) -> int:
     """Activate or reconfigure AI Observer on the developer's computer."""
     cfg = load_config()
     raw_server = args.server or cfg.get("server_url")
-    server = normalize_url(raw_server if raw_server and "://" in raw_server else "http://127.0.0.1:8787")
+    server = normalize_url(raw_server if raw_server and "://" in raw_server else DEFAULT_SERVER)
     user = args.user or cfg.get("user") or os.environ.get("USERNAME") or os.environ.get("USER") or "dev"
     project = args.project or cfg.get("project") or "default-project"
     key = args.key or cfg.get("api_key")
@@ -292,7 +295,7 @@ def main() -> int:
 
     # activate
     p_act = subparsers.add_parser("activate", help="Configure and activate Observer in this terminal")
-    p_act.add_argument("--server", help="Observer server URL (e.g. http://192.168.1.50:8787)")
+    p_act.add_argument("--server", help="Observer server URL (default: https://ai-observer-8wcb.onrender.com)")
     p_act.add_argument("--user", help="Your developer username / session ID")
     p_act.add_argument("--project", help="Default project tag")
     p_act.add_argument("--key", help="Your personal API key")
