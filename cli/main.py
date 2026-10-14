@@ -301,6 +301,8 @@ def main() -> int:
         prog="observer",
         description="AI Model Observer CLI - Activate terminal proxying and track LLM usage.",
     )
+    parser.add_argument("--admin", action="store_true", help="Open visual dashboard in Admin mode")
+    parser.add_argument("--token", help="Admin secret token")
     subparsers = parser.add_subparsers(dest="subcommand", help="Available subcommands")
 
     # activate
@@ -341,6 +343,8 @@ def main() -> int:
     args = parser.parse_args()
 
     if not args.subcommand:
+        if getattr(args, "admin", False) or getattr(args, "token", None):
+            return cmd_dashboard(args)
         parser.print_help()
         return 0
 
