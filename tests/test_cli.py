@@ -33,7 +33,7 @@ def test_models_catalog_definition():
 
 def test_cmd_models_output(capsys):
     mock_args = MagicMock()
-    mock_args.server = "https://ai-observer-8wcb.onrender.com"
+    mock_args.server = "https://volt-ai-lmgz.onrender.com"
     ret = cmd_models(mock_args)
     assert ret == 0
     captured = capsys.readouterr().out

@@ -50,7 +50,7 @@ def save_config(cfg: Dict[str, Any]) -> None:
         pass
 
 
-DEFAULT_SERVER = os.environ.get("VOLT_SERVER_URL") or os.environ.get("OBSERVER_SERVER_URL", "https://ai-observer-8wcb.onrender.com")
+DEFAULT_SERVER = os.environ.get("VOLT_SERVER_URL") or os.environ.get("OBSERVER_SERVER_URL", "https://volt-ai-lmgz.onrender.com")
 
 
 def normalize_url(url: str) -> str:
@@ -1034,7 +1034,7 @@ def main() -> int:
 
     # activate
     p_act = subparsers.add_parser("activate", help="Configure and activate VOLT-AI in this terminal")
-    p_act.add_argument("--server", help="VOLT-AI server URL (default: https://ai-observer-8wcb.onrender.com)")
+    p_act.add_argument("--server", help="VOLT-AI server URL (default: https://volt-ai-lmgz.onrender.com)")
     p_act.add_argument("--user", help="Your developer username / session ID")
     p_act.add_argument("--project", help="Default project tag")
     p_act.add_argument("--key", help="Your personal API key")
