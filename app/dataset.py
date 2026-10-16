@@ -36,6 +36,10 @@ def extract_conversation_turns(request_body: Any, response_text: Optional[str], 
             role = m.get("role", "user")
             content = m.get("content", "")
             if isinstance(content, list):
+                has_image = any(isinstance(b, dict) and b.get("type") in ("image_url", "image") for b in content)
+                if has_image:
+                    messages.append({"role": role, "content": content})
+                    continue
                 # Anthropic content blocks
                 text_parts = [b.get("text", "") for b in content if isinstance(b, dict) and b.get("type") == "text"]
                 content = "\n".join(text_parts)
@@ -47,6 +51,10 @@ def extract_conversation_turns(request_body: Any, response_text: Optional[str], 
             role = m.get("role", "user")
             content = m.get("content", "")
             if isinstance(content, list):
+                has_image = any(isinstance(b, dict) and b.get("type") in ("image_url", "image") for b in content)
+                if has_image:
+                    messages.append({"role": role, "content": content})
+                    continue
                 text_parts = [b.get("text", "") for b in content if isinstance(b, dict) and b.get("type") == "text"]
                 content = "\n".join(text_parts)
             if content:
@@ -287,6 +295,82 @@ async def export_dpo_dataset(
         })
 
     return dpo_pairs
+
+
+async def export_multimodal_dataset(
+    pool: asyncpg.Pool,
+    project: Optional[str] = None,
+    verified_statuses: Optional[List[str]] = None,
+    image_dir: Optional[str] = "./data/multimodal_images",
+    limit: Optional[int] = None
+) -> List[Dict[str, Any]]:
+    """
+    Export multimodal dataset (UI screenshot + prompt -> generated code) for Vision-Language Models (Qwen2-VL).
+    Saves embedded base64 image strings into image files in `image_dir` and generates JSONL records.
+    """
+    import base64
+    from pathlib import Path
+
+    statuses = verified_statuses or ["pass", "accepted"]
+    query = """
+        SELECT c.id, c.task_id, c.project, c.task_type, c.model, c.api_style,
+               c.request, c.response_text, c.latency_ms, c.input_tokens, c.output_tokens,
+               o.status AS outcome_status, o.kind AS outcome_kind, c.ts
+        FROM llm_calls c
+        JOIN outcomes o ON o.task_id = c.task_id
+        WHERE o.status = ANY($1::text[])
+          AND c.response_text IS NOT NULL
+          AND c.response_text != ''
+          AND (c.task_type = 'vision' OR c.request::text LIKE '%image_url%')
+    """
+    params: List[Any] = [statuses]
+    idx = 2
+    if project:
+        query += f" AND (c.project = ${idx} OR c.project IS NULL)"
+        params.append(project)
+        idx += 1
+
+    query += " ORDER BY c.ts DESC"
+    if limit:
+        query += f" LIMIT ${idx}"
+        params.append(limit)
+
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(query, *params)
+        raw_calls = [dict(r) for r in rows]
+
+    records = []
+    if image_dir:
+        Path(image_dir).mkdir(parents=True, exist_ok=True)
+
+    for call in raw_calls:
+        formatted = format_sft_record(call)
+        if not formatted:
+            continue
+
+        msgs = formatted["messages"]
+        for m in msgs:
+            content = m.get("content")
+            if isinstance(content, list):
+                for part in content:
+                    if isinstance(part, dict) and part.get("type") == "image_url":
+                        url_val = part.get("image_url", {}).get("url", "")
+                        if "base64," in url_val and image_dir:
+                            try:
+                                header, b64_str = url_val.split("base64,", 1)
+                                ext = "png"
+                                if "image/jpeg" in header or "image/jpg" in header:
+                                    ext = "jpg"
+                                img_filename = f"img_{call['id']}.{ext}"
+                                img_path = Path(image_dir) / img_filename
+                                with open(img_path, "wb") as img_f:
+                                    img_f.write(base64.b64decode(b64_str))
+                                part["image_url"]["url"] = str(img_path.as_posix())
+                            except Exception:
+                                pass
+        records.append(formatted)
+
+    return records
 
 
 def split_dataset(records: List[Dict[str, Any]], val_ratio: float = 0.1, seed: int = 42) -> Dict[str, List[Dict[str, Any]]]:

@@ -3,6 +3,7 @@ import os
 import pytest
 from training.lora_config import LoRATrainingConfig
 from training.train_lora import validate_dataset_file, run_training_dry_run
+from training.train_vision_vlm import validate_multimodal_dataset, run_vision_training_dry_run
 from training.evaluate_finetuned import compare_model_evaluations, format_comparison_markdown_report
 
 
@@ -97,3 +98,41 @@ def test_compare_model_evaluations_and_report():
     assert "🏆 IMPROVED" in report
     assert "**+50.0%**" in report
     assert "WIN (Fixed failure)" in report
+
+
+def test_validate_multimodal_dataset_and_dry_run(tmp_path):
+    dataset_file = tmp_path / "multimodal_sft.jsonl"
+    output_dir = tmp_path / "checkpoints_vlm"
+
+    sample_lines = [
+        {
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "image_url", "image_url": {"url": "data:image/png;base64,iVBORw0KGgo="}},
+                        {"type": "text", "text": "Convert this UI design mockup to HTML/Tailwind."}
+                    ]
+                },
+                {"role": "assistant", "content": "```html\n<div class=\"bg-blue-500\">Navbar</div>\n```"}
+            ]
+        }
+    ]
+    with open(dataset_file, "w", encoding="utf-8") as f:
+        for item in sample_lines:
+            f.write(json.dumps(item) + "\n")
+
+    stats = validate_multimodal_dataset(str(dataset_file))
+    assert stats["valid"] is True
+    assert stats["records_count"] == 1
+    assert stats["image_count"] == 1
+
+    summary = run_vision_training_dry_run(
+        dataset_path=str(dataset_file),
+        output_dir=str(output_dir),
+        model_name="Qwen/Qwen2-VL-7B-Instruct",
+    )
+    assert summary["status"] == "completed_dry_run"
+    assert summary["image_count"] == 1
+    assert os.path.exists(output_dir / "training_summary.json")
+
