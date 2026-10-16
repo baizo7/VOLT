@@ -355,7 +355,7 @@ def query_observer_coder(
     project: Optional[str] = None,
     temperature: float = 0.2,
     stream: bool = True,
-    timeout: int = 120,
+    timeout: int = 180,
 ) -> Tuple[str, Dict[str, Any]]:
     """
     Sends request to /v1/chat/completions for observer-coder-1.0.

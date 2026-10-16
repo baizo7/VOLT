@@ -84,6 +84,28 @@ MATH_KEYWORDS = {
     "statistics", "theorem", "lemma", "derivative", "integral", "eigenvalue"
 }
 
+CODER_SYSTEM_INSTRUCTION = (
+    "You are ObserverCoder-1.0, an expert autonomous software engineer and full-stack developer.\n"
+    "Your mission is to directly implement clean, complete, production-ready code that satisfies the user's request.\n"
+    "\n"
+    "CRITICAL RULES:\n"
+    "1. DIRECT CODE GENERATION: When asked to build, create, develop, or write anything (websites, applications, scripts, APIs, tools), "
+    "DO NOT provide generic marketing advice, high-level business steps, or recommend website builders like Wix, Squarespace, or WordPress. "
+    "Immediately write the actual, fully functional code files.\n"
+    "2. FILE LABELS: Always label code blocks with the target filename on the opening fence line, for example:\n"
+    "   ```html index.html\n"
+    "   <!DOCTYPE html>...\n"
+    "   ```\n"
+    "   ```css style.css\n"
+    "   ...\n"
+    "   ```\n"
+    "   ```python app.py\n"
+    "   ...\n"
+    "   ```\n"
+    "3. COMPLETE CODE: Always write full, working code without truncation or placeholders (avoid '<!-- add more items here -->').\n"
+    "4. MODERN & VISUAL: For web pages, include modern CSS styling (embedded or in style.css) so the page looks professional immediately."
+)
+
 
 def analyze_intent(messages: List[Dict[str, Any]]) -> Dict[str, Any]:
     """
@@ -204,7 +226,7 @@ async def call_specialist(
             body["max_tokens"] = max_tokens
 
         # Fail fast on local endpoints (5s timeout) so cloud fallbacks are not stalled
-        timeout = 5.0 if target_model.startswith("local/") else 90.0
+        timeout = 5.0 if target_model.startswith("local/") else 150.0
 
         try:
             resp = await client.post(url, json=body, headers=headers, timeout=timeout)
@@ -308,11 +330,10 @@ async def coordinate_request(
 
             # Pass 2: Coder implements the solution based on the reasoning blueprint
             coder_system = (
-                "You are the Lead Code Synthesis Specialist for ObserverCoder-1.0. "
-                f"Here is the verified architectural strategy from our Reasoning Specialist:\n\n"
+                CODER_SYSTEM_INSTRUCTION + "\n\n"
+                f"Here is the verified architectural strategy from our Reasoning Specialist:\n"
                 f"<strategy>\n{reasoning_blueprint}\n</strategy>\n\n"
-                "Now write clean, modular, production-ready code implementing this exact plan. "
-                "Include brief explanations where helpful."
+                "Now write clean, modular, production-ready code implementing this exact plan."
             )
             code_res, in2, out2 = await call_specialist(
                 client=client,
@@ -331,6 +352,16 @@ async def coordinate_request(
         else:
             # Fast direct track: Vision or Fast Coder
             specialist_key = specialists[0]
+            custom_prompt = None
+            if specialist_key in ("fast_coder", "heavy_coder"):
+                custom_prompt = CODER_SYSTEM_INSTRUCTION
+            elif specialist_key == "vision_specialist":
+                custom_prompt = (
+                    "You are the Multimodal UI Specialist for ObserverCoder-1.0. "
+                    "Analyze the provided image and generate matching, production-ready frontend code. "
+                    "Label every code block with its target filename (e.g. ```html index.html```)."
+                )
+
             res, in_tok, out_tok = await call_specialist(
                 client=client,
                 specialist_key=specialist_key,
@@ -338,11 +369,13 @@ async def coordinate_request(
                 temperature=temperature,
                 max_tokens=max_tokens,
                 routes_map=routes_map,
+                custom_system_prompt=custom_prompt,
                 client_auth_header=client_auth,
             )
             total_in += in_tok
             total_out += out_tok
             final_text = res
+
 
     except SpecialistExecutionError as err:
         latency_ms = int((time.perf_counter() - t0) * 1000)
