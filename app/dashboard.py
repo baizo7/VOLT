@@ -69,6 +69,9 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       <span id="health-badge" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-950/60 text-emerald-400 border border-emerald-800/50">
         <span class="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse"></span>Connecting
       </span>
+      <span id="live-badge" title="WebSocket Live Telemetry Stream" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-indigo-950/60 text-indigo-400 border border-indigo-800/50">
+        <span id="live-dot" class="h-1.5 w-1.5 rounded-full bg-indigo-400 animate-pulse"></span><span id="live-text">Live WS</span>
+      </span>
       <button onclick="fetchData()" class="px-2.5 py-1.5 text-[11px] font-medium bg-surface-800 hover:bg-surface-700 text-slate-300 rounded-lg border border-surface-700 transition">Refresh</button>
       <button onclick="openAccessModal()" class="px-2.5 py-1.5 text-[11px] font-semibold bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg shadow-sm transition">Switch View</button>
     </div>
@@ -76,6 +79,25 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 </header>
 
 <main class="flex-1 max-w-[1440px] w-full mx-auto px-4 md:px-6 py-4 space-y-3.5">
+
+<!-- ========== AUTONOMOUS AGENT LOOP ALERT BANNER ========== -->
+<section id="loop-alert-banner" class="hidden card px-4 py-3 border-rose-500/50 bg-gradient-to-r from-rose-950/50 via-surface-900 to-surface-900 flex flex-wrap items-center justify-between gap-3 shadow-lg shadow-rose-950/20 fade-in">
+  <div class="flex items-center gap-3">
+    <div class="h-9 w-9 rounded-xl bg-rose-500/20 text-rose-400 flex items-center justify-center text-lg border border-rose-500/30">⚠️</div>
+    <div>
+      <div class="flex items-center gap-2">
+        <span class="text-xs font-bold text-rose-200 uppercase tracking-wide">Autonomous Agent Loop Detected</span>
+        <span id="loop-alert-badge" class="text-[9px] font-bold px-2 py-0.5 rounded-full bg-rose-950 text-rose-400 border border-rose-800">WARNING</span>
+      </div>
+      <p id="loop-alert-msg" class="text-[11px] text-slate-300 mt-0.5">High retry frequency detected on task with repeated failures.</p>
+    </div>
+  </div>
+  <div class="flex items-center gap-2">
+    <button id="loop-inspect-btn" onclick="inspectStuckTask()" class="px-3 py-1.5 text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white rounded-lg transition shadow-sm flex items-center gap-1.5">
+      <span>🔍 Inspect Stuck Task</span>
+    </button>
+  </div>
+</section>
 
 <!-- ========== DEVELOPER PROFILE BANNER ========== -->
 <section id="developer-banner" class="hidden card px-3.5 py-2 flex flex-wrap items-center justify-between gap-2.5 border-indigo-900/30 bg-gradient-to-r from-surface-900 to-indigo-950/20 fade-in">
@@ -89,7 +111,13 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       </div>
     </div>
   </div>
-  <div class="flex items-center gap-2 text-[10px]">
+  <div class="flex items-center gap-2.5 text-[10px]">
+    <div class="bg-surface-950/60 px-2.5 py-1 rounded-md border border-surface-700/70 flex items-center gap-2">
+      <div><span class="text-slate-400 text-[10px]">Daily Quota:</span> <span id="banner-quota-text" class="text-[10px] font-bold text-cyan-400 ml-0.5">0%</span></div>
+      <div class="w-16 h-1.5 bg-surface-800 rounded-full overflow-hidden">
+        <div id="banner-quota-bar" class="h-full bg-cyan-400 transition-all duration-300" style="width: 0%"></div>
+      </div>
+    </div>
     <div class="bg-surface-950/60 px-2.5 py-1 rounded-md border border-surface-700/70"><span class="text-slate-400">Key:</span> <span id="banner-masked-key" class="mono text-cyan-400 font-semibold ml-0.5">•••</span></div>
     <div class="bg-surface-950/60 px-2.5 py-1 rounded-md border border-surface-700/70"><span class="text-slate-400">Provider:</span> <span id="banner-provider" class="uppercase font-semibold text-slate-200 ml-0.5">—</span></div>
   </div>
@@ -257,6 +285,63 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       <div id="export-summary-content" class="text-xs text-slate-300 space-y-1"></div>
     </div>
   </section>
+
+  <!-- Specialist Model Retraining Center (Phase 6) -->
+  <section class="card p-6 space-y-5 border border-indigo-900/40 bg-gradient-to-br from-surface-900 to-indigo-950/20">
+    <div>
+      <h2 class="text-sm font-bold text-violet-300 uppercase tracking-wider flex items-center gap-2">🚀 Specialist Model Retraining Center</h2>
+      <p class="text-[11px] text-slate-400 mt-1">Launch cloud/local fine-tuning runs for Observer specialist models using verified telemetry.</p>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div>
+        <label class="block text-[11px] font-bold text-slate-400 uppercase mb-1.5">Specialist Model</label>
+        <select id="retrain-model" class="w-full px-3 py-2 text-xs bg-surface-800 border border-surface-700 rounded-lg text-white focus:outline-none focus:border-indigo-500">
+          <option value="Qwen/Qwen2.5-Coder-1.5B">Fast Coder (Qwen2.5-Coder-1.5B)</option>
+          <option value="Qwen/Qwen2.5-Coder-7B">Heavy Coder (Qwen2.5-Coder-7B)</option>
+          <option value="deepseek-ai/DeepSeek-R1">Deep Reasoner (DeepSeek-R1)</option>
+          <option value="Qwen/Qwen2.5-Math-7B">Math Specialist (Qwen2.5-Math-7B)</option>
+          <option value="Qwen/Qwen2-VL-7B-Instruct">Vision Specialist (Qwen2-VL-7B)</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-[11px] font-bold text-slate-400 uppercase mb-1.5">Training Objective</label>
+        <select id="retrain-dataset-type" class="w-full px-3 py-2 text-xs bg-surface-800 border border-surface-700 rounded-lg text-white focus:outline-none focus:border-indigo-500">
+          <option value="sft">Supervised Fine-Tuning (SFT)</option>
+          <option value="dpo">Direct Preference Optimization (DPO)</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-[11px] font-bold text-slate-400 uppercase mb-1.5">LoRA Rank (r)</label>
+        <select id="retrain-rank" class="w-full px-3 py-2 text-xs bg-surface-800 border border-surface-700 rounded-lg text-white focus:outline-none focus:border-indigo-500">
+          <option value="16">Rank 16 (Alpha 32)</option>
+          <option value="32">Rank 32 (Alpha 64)</option>
+          <option value="64">Rank 64 (Alpha 128)</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-[11px] font-bold text-slate-400 uppercase mb-1.5">Epochs</label>
+        <input id="retrain-epochs" type="number" value="3" min="1" max="10" class="w-full px-3 py-2 text-xs bg-surface-800 border border-surface-700 rounded-lg text-white focus:outline-none focus:border-indigo-500">
+      </div>
+    </div>
+    <div class="flex items-center gap-4">
+      <button onclick="triggerRetraining()" id="retrain-run-btn" class="px-5 py-2.5 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-violet-500/20 transition flex items-center gap-2">
+        <span id="retrain-spinner" class="hidden h-3 w-3 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+        <span>🚀 Launch Retraining Run</span>
+      </button>
+      <span id="retrain-status-text" class="text-xs text-slate-400"></span>
+    </div>
+    <!-- Terminal Output Drawer -->
+    <div id="retrain-console" class="hidden bg-surface-950 border border-surface-800 rounded-xl p-3.5 space-y-2 mono text-xs">
+      <div class="flex items-center justify-between text-slate-400 text-[11px] border-b border-surface-800/80 pb-2">
+        <span class="flex items-center gap-1.5"><span class="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span> Cloud GPU Execution Console</span>
+        <span id="retrain-job-id" class="text-indigo-400 font-bold"></span>
+      </div>
+      <div class="w-full bg-surface-800 rounded-full h-1.5 overflow-hidden">
+        <div id="retrain-progress-bar" class="bg-gradient-to-r from-indigo-500 to-violet-500 h-1.5 transition-all duration-300" style="width: 0%"></div>
+      </div>
+      <div id="retrain-log-output" class="text-slate-300 text-[11px] max-h-48 overflow-y-auto space-y-1 py-1"></div>
+    </div>
+  </section>
 </div>
 
 <!-- ====================== TAB: IDE SETUP ====================== -->
@@ -323,6 +408,9 @@ let S = {
   filterUser: null,
   exportType: 'sft',
   statsCache: [],
+  ws: null,
+  stuckTaskId: null,
+  retrainPollTimer: null,
 };
 let activityChart = null, tokenChart = null;
 
@@ -856,19 +944,278 @@ function submitDeveloperLogin() {
   S.user = document.getElementById('modal-input-user').value.trim() || 'dev';
   S.role = 'dev'; S.adminToken = ''; S.filterUser = null;
   localStorage.setItem('ao_user', S.user); localStorage.removeItem('ao_admin_token');
-  closeAccessModal(); updateUIForRole(); fetchData();
+  closeAccessModal(); updateUIForRole(); fetchData(); initWebSocket(); fetchQuotas();
 }
 async function submitAdminLogin() {
   const key = document.getElementById('modal-input-admin-key').value.trim(); if (!key) return;
   try {
     const r = await fetch('/admin/verify', { headers: { 'X-Admin-Token': key, 'Authorization': 'Bearer '+key } });
-    if (r.ok) { S.role='admin'; S.adminToken=key; S.filterUser=null; localStorage.setItem('ao_admin_token',key); closeAccessModal(); updateUIForRole(); fetchData(); }
+    if (r.ok) { S.role='admin'; S.adminToken=key; S.filterUser=null; localStorage.setItem('ao_admin_token',key); closeAccessModal(); updateUIForRole(); fetchData(); initWebSocket(); fetchQuotas(); }
     else alert('Invalid Admin Key.');
   } catch(e) { alert('Error: '+e); }
 }
 
+// ────────── Phase 6: WebSockets Live Stream ──────────
+function initWebSocket() {
+  if (S.ws) {
+    try { S.ws.close(); } catch(e) {}
+    S.ws = null;
+  }
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  let wsUrl = `${proto}//${location.host}/ws/live`;
+  const params = [];
+  if (S.adminToken) params.push('admin_token=' + encodeURIComponent(S.adminToken));
+  if (S.user) params.push('session_id=' + encodeURIComponent(S.user));
+  if (params.length) wsUrl += '?' + params.join('&');
+
+  const liveBadge = document.getElementById('live-badge');
+  const liveDot = document.getElementById('live-dot');
+  const liveText = document.getElementById('live-text');
+
+  try {
+    const ws = new WebSocket(wsUrl);
+    S.ws = ws;
+
+    ws.onopen = () => {
+      if (liveBadge) liveBadge.className = "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-950/60 text-emerald-400 border border-emerald-800/50";
+      if (liveDot) liveDot.className = "h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse";
+      if (liveText) liveText.textContent = "⚡ Live Feed";
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data);
+        if (msg.type === 'call') {
+          handleLiveCall(msg.data);
+        } else if (msg.type === 'outcome') {
+          handleLiveOutcome(msg.data);
+        } else if (msg.type === 'retrain_completed') {
+          handleLiveRetrainCompleted(msg.data);
+        }
+      } catch (err) {
+        console.debug("WS parse error", err);
+      }
+    };
+
+    ws.onclose = () => {
+      if (liveBadge) liveBadge.className = "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-surface-800 text-slate-400 border border-surface-700";
+      if (liveDot) liveDot.className = "h-1.5 w-1.5 rounded-full bg-slate-500";
+      if (liveText) liveText.textContent = "Live WS (reconnecting)";
+      setTimeout(() => {
+        if (!S.ws || S.ws.readyState === WebSocket.CLOSED) {
+          initWebSocket();
+        }
+      }, 5000);
+    };
+
+    ws.onerror = () => {
+      try { ws.close(); } catch(e) {}
+    };
+  } catch (err) {
+    console.debug("WS init error", err);
+  }
+}
+
+function handleLiveCall(c) {
+  const totCallsEl = document.getElementById('total-calls');
+  if (totCallsEl && totCallsEl.textContent !== '—') {
+    const current = parseInt(totCallsEl.textContent.replace(/,/g, '')) || 0;
+    totCallsEl.textContent = (current + 1).toLocaleString();
+  }
+  const tb = document.getElementById('tasks-body');
+  if (tb && c.task_id) {
+    let existingRow = document.getElementById('task-row-' + c.task_id);
+    if (!existingRow) {
+      const tr = document.createElement('tr');
+      tr.id = 'task-row-' + c.task_id;
+      tr.className = "hover:bg-surface-800/60 cursor-pointer transition border-b border-surface-700/50 bg-indigo-950/40 fade-in";
+      tr.onclick = () => openTracePanel(c.task_id);
+      tr.innerHTML = `
+        <td class="py-2.5 px-4 font-mono text-cyan-400 font-semibold flex items-center gap-2">
+          <span class="h-1.5 w-1.5 rounded-full bg-indigo-400 animate-pulse"></span>${c.task_id}
+        </td>
+        <td class="py-2.5 px-4 text-slate-300">${c.project||'—'}</td>
+        <td class="py-2.5 px-4"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-surface-800 text-slate-300">coding</span></td>
+        <td class="py-2.5 px-4 text-white font-bold" id="task-calls-${c.task_id}">1</td>
+        <td class="py-2.5 px-4 font-mono text-slate-300 text-xs">${c.model||'—'}</td>
+        <td class="py-2.5 px-4" id="task-outcome-${c.task_id}"><span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-surface-800 text-slate-400">running</span></td>
+        <td class="py-2.5 px-4 text-slate-500 text-[11px]">Just now</td>
+      `;
+      if (tb.firstChild) tb.insertBefore(tr, tb.firstChild);
+      else tb.appendChild(tr);
+    } else {
+      const callsCell = document.getElementById('task-calls-' + c.task_id);
+      if (callsCell) {
+        const count = parseInt(callsCell.textContent) || 0;
+        callsCell.textContent = count + 1;
+      }
+      existingRow.classList.add('bg-indigo-950/40');
+      setTimeout(() => existingRow.classList.remove('bg-indigo-950/40'), 1500);
+    }
+  }
+}
+
+function handleLiveOutcome(o) {
+  const badge = document.getElementById('task-outcome-' + o.task_id);
+  if (badge) {
+    if (o.status === 'pass' || o.status === 'accepted') {
+      badge.innerHTML = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-950 text-emerald-400 border border-emerald-800">pass</span>';
+    } else {
+      badge.innerHTML = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-950 text-rose-400 border border-rose-800">fail</span>';
+    }
+  }
+}
+
+function handleLiveRetrainCompleted(data) {
+  const statusEl = document.getElementById('retrain-status-text');
+  if (statusEl) {
+    statusEl.innerHTML = `<span class="text-emerald-400 font-bold">✓ Job ${data.job_id} Completed! Adapter saved at ${data.adapter_path}</span>`;
+  }
+}
+
+// ────────── Phase 6: Quotas & Loop Alerts ──────────
+async function fetchQuotas() {
+  try {
+    let qUrl = '/stats/quotas';
+    if (S.role !== 'admin' && S.user) {
+      qUrl += '?session_id=' + encodeURIComponent(S.user);
+    } else if (S.role === 'admin' && S.filterUser) {
+      qUrl += '?session_id=' + encodeURIComponent(S.filterUser);
+    }
+    const res = await fetch(qUrl, { headers: authHeaders() });
+    if (!res.ok) return;
+    const d = await res.json();
+
+    const qText = document.getElementById('banner-quota-text');
+    const qBar = document.getElementById('banner-quota-bar');
+    if (qText && qBar) {
+      const pct = Math.min(100, d.usage_pct || 0);
+      qText.textContent = `${(d.tokens_today||0).toLocaleString()} / ${(d.daily_budget||100000).toLocaleString()} (${pct}%)`;
+      qBar.style.width = pct + '%';
+      if (pct >= 90) {
+        qBar.className = "h-full bg-rose-500 transition-all duration-300";
+        qText.className = "text-[10px] font-bold text-rose-400 ml-0.5";
+      } else if (pct >= 70) {
+        qBar.className = "h-full bg-amber-400 transition-all duration-300";
+        qText.className = "text-[10px] font-bold text-amber-400 ml-0.5";
+      } else {
+        qBar.className = "h-full bg-cyan-400 transition-all duration-300";
+        qText.className = "text-[10px] font-bold text-cyan-400 ml-0.5";
+      }
+    }
+
+    const loopBanner = document.getElementById('loop-alert-banner');
+    if (d.loop_detected && d.active_alerts && d.active_alerts.length > 0) {
+      const topAlert = d.active_alerts[0];
+      S.stuckTaskId = topAlert.task_id;
+      document.getElementById('loop-alert-msg').textContent = topAlert.reason;
+      document.getElementById('loop-alert-badge').textContent = (topAlert.severity || 'WARNING').toUpperCase();
+      loopBanner.classList.remove('hidden');
+    } else {
+      loopBanner.classList.add('hidden');
+    }
+  } catch(e) {
+    console.debug('Quota fetch error', e);
+  }
+}
+
+function inspectStuckTask() {
+  if (S.stuckTaskId) {
+    openTracePanel(S.stuckTaskId);
+  }
+}
+
+// ────────── Phase 6: Retraining Center ──────────
+async function triggerRetraining() {
+  const btn = document.getElementById('retrain-run-btn');
+  const spinner = document.getElementById('retrain-spinner');
+  const statusText = document.getElementById('retrain-status-text');
+  const consoleEl = document.getElementById('retrain-console');
+  const logEl = document.getElementById('retrain-log-output');
+  const progressBar = document.getElementById('retrain-progress-bar');
+  const jobIdEl = document.getElementById('retrain-job-id');
+
+  const model = document.getElementById('retrain-model').value;
+  const datasetType = document.getElementById('retrain-dataset-type').value;
+  const rank = parseInt(document.getElementById('retrain-rank').value) || 16;
+  const epochs = parseInt(document.getElementById('retrain-epochs').value) || 3;
+
+  btn.disabled = true;
+  spinner.classList.remove('hidden');
+  statusText.textContent = 'Queueing job...';
+  consoleEl.classList.remove('hidden');
+  logEl.innerHTML = '';
+  progressBar.style.width = '10%';
+
+  try {
+    const res = await fetch('/admin/retrain/trigger', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ model, dataset_type: datasetType, rank, alpha: rank * 2, epochs }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      statusText.textContent = 'Error: ' + (err.error || res.statusText);
+      btn.disabled = false;
+      spinner.classList.add('hidden');
+      return;
+    }
+
+    const data = await res.json();
+    jobIdEl.textContent = data.job_id;
+    statusText.textContent = 'Job running in background...';
+
+    pollRetrainingJob(data.job_id);
+  } catch(e) {
+    statusText.textContent = 'Error: ' + e;
+    btn.disabled = false;
+    spinner.classList.add('hidden');
+  }
+}
+
+function pollRetrainingJob(jobId) {
+  if (S.retrainPollTimer) clearInterval(S.retrainPollTimer);
+
+  S.retrainPollTimer = setInterval(async () => {
+    try {
+      const res = await fetch('/admin/retrain/status/' + encodeURIComponent(jobId), {
+        headers: authHeaders(),
+      });
+      if (!res.ok) return;
+      const job = await res.json();
+
+      const logEl = document.getElementById('retrain-log-output');
+      const progressBar = document.getElementById('retrain-progress-bar');
+      const statusText = document.getElementById('retrain-status-text');
+      const btn = document.getElementById('retrain-run-btn');
+      const spinner = document.getElementById('retrain-spinner');
+
+      progressBar.style.width = (job.progress || 10) + '%';
+      logEl.innerHTML = (job.logs || []).map(l => `<div class="text-slate-300">${l}</div>`).join('');
+      logEl.scrollTop = logEl.scrollHeight;
+
+      if (job.status === 'completed') {
+        clearInterval(S.retrainPollTimer);
+        S.retrainPollTimer = null;
+        btn.disabled = false;
+        spinner.classList.add('hidden');
+        statusText.innerHTML = `<span class="text-emerald-400 font-bold">✓ Retraining complete! Adapter saved to ${job.adapter_path}</span>`;
+      } else if (job.status === 'failed') {
+        clearInterval(S.retrainPollTimer);
+        S.retrainPollTimer = null;
+        btn.disabled = false;
+        spinner.classList.add('hidden');
+        statusText.innerHTML = `<span class="text-rose-400 font-bold">✕ Retraining failed: ${job.error || 'Unknown error'}</span>`;
+      }
+    } catch(e) {
+      console.debug('Retrain poll error', e);
+    }
+  }, 1000);
+}
+
 // ────────── Boot ──────────
-initAuth(); fetchData(); setInterval(fetchData, 8000);
+initAuth(); fetchData(); initWebSocket(); fetchQuotas(); setInterval(fetchData, 8000); setInterval(fetchQuotas, 10000);
 </script>
 </body>
 </html>
