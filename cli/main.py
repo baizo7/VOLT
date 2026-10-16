@@ -193,10 +193,51 @@ def cmd_usage(args: argparse.Namespace) -> int:
     if query_params:
         url += "?" + "&".join(query_params)
 
+    admin_token = (
+        getattr(args, "token", None)
+        or os.environ.get("OBSERVER_ADMIN_KEY")
+        or os.environ.get("OBSERVER_ADMIN_TOKEN")
+        or cfg.get("admin_key")
+    )
+
+    headers = {"User-Agent": "AI-Observer-CLI/1.0"}
+    if admin_token:
+        headers["X-Admin-Token"] = str(admin_token).strip()
+        headers["Authorization"] = f"Bearer {str(admin_token).strip()}"
+    if user:
+        headers["X-Session-Id"] = user
+
     try:
-        req = urllib.request.Request(url, headers={"User-Agent": "AI-Observer-CLI/1.0"})
+        req = urllib.request.Request(url, headers=headers)
         with urllib.request.urlopen(req, timeout=10) as resp:
             stats = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        server_detail = ""
+        try:
+            raw_body = exc.read().decode("utf-8", errors="replace")
+            parsed = json.loads(raw_body)
+            server_detail = parsed.get("error") or parsed.get("detail") or raw_body
+        except Exception:
+            server_detail = str(exc)
+
+        if exc.code == 401 and args.all:
+            print(f"\n[!] Error: Unable to fetch team-wide usage (--all) from {server}.", file=sys.stderr)
+            print(f"    Server message: {server_detail}", file=sys.stderr)
+            print("\nViewing organization-wide usage across all developers requires Administrator privileges.", file=sys.stderr)
+            print("Please provide your admin key using the --token option:", file=sys.stderr)
+            print("    observer usage --all --token <YOUR_ADMIN_KEY>", file=sys.stderr)
+            print("Or set the OBSERVER_ADMIN_KEY environment variable in PowerShell:", file=sys.stderr)
+            print('    $env:OBSERVER_ADMIN_KEY = "your_admin_key"', file=sys.stderr)
+            return 1
+        elif exc.code == 401:
+            print(f"\n[!] Authentication Required (HTTP 401): {server_detail}", file=sys.stderr)
+            return 1
+        elif exc.code == 403:
+            print(f"\n[!] Access Denied (HTTP 403): {server_detail}", file=sys.stderr)
+            return 1
+        else:
+            print(f"Error: Unable to fetch usage from {url} (HTTP {exc.code}: {server_detail})", file=sys.stderr)
+            return 1
     except Exception as exc:
         print(f"Error: Unable to fetch usage from {url} ({exc})", file=sys.stderr)
         return 1
@@ -1004,6 +1045,7 @@ def main() -> int:
     p_usage.add_argument("--user", help="Filter by specific developer username")
     p_usage.add_argument("--project", help="Filter by project")
     p_usage.add_argument("--all", action="store_true", help="Show all team usage instead of just yours")
+    p_usage.add_argument("--token", "--admin-key", dest="token", help="Admin secret key for team-wide statistics")
 
     # dashboard
     p_dash = subparsers.add_parser("dashboard", help="Open visual web dashboard in browser")

@@ -304,3 +304,74 @@ def test_query_observer_coder_streaming_with_indicator():
     assert text == "Hello world"
     assert meta["track"] == "fast_coding"
 
+
+def test_cmd_usage_personal(capsys):
+    from cli.main import cmd_usage
+    mock_args = MagicMock()
+    mock_args.server = "http://testserver"
+    mock_args.user = "dev1"
+    mock_args.project = "proj1"
+    mock_args.all = False
+    mock_args.token = None
+
+    mock_resp = MagicMock()
+    mock_resp.read.return_value = json.dumps([
+        {"model": "gpt-4o", "calls": 5, "avg_latency_ms": 200, "input_tokens": 100, "output_tokens": 50, "passes": 5, "fails": 0}
+    ]).encode("utf-8")
+    mock_resp.__enter__.return_value = mock_resp
+
+    with patch("urllib.request.urlopen", return_value=mock_resp):
+        ret = cmd_usage(mock_args)
+    assert ret == 0
+    out = capsys.readouterr().out
+    assert "gpt-4o" in out
+    assert "Developer: dev1" in out
+
+
+def test_cmd_usage_all_unauthorized_message(capsys):
+    import urllib.error
+    from cli.main import cmd_usage
+    mock_args = MagicMock()
+    mock_args.server = "http://testserver"
+    mock_args.user = None
+    mock_args.project = None
+    mock_args.all = True
+    mock_args.token = None
+
+    err_fp = io.BytesIO(b'{"error": "unauthorized: admin privileges required"}')
+    http_err = urllib.error.HTTPError("http://testserver/stats", 401, "Unauthorized", {}, err_fp)
+
+    with patch("urllib.request.urlopen", side_effect=http_err):
+        ret = cmd_usage(mock_args)
+    assert ret == 1
+    err = capsys.readouterr().err
+    assert "Viewing organization-wide usage across all developers requires Administrator privileges" in err
+    assert "--token <YOUR_ADMIN_KEY>" in err
+
+
+def test_cmd_usage_all_with_token(capsys):
+    from cli.main import cmd_usage
+    mock_args = MagicMock()
+    mock_args.server = "http://testserver"
+    mock_args.user = None
+    mock_args.project = None
+    mock_args.all = True
+    mock_args.token = "valid-secret"
+
+    mock_resp = MagicMock()
+    mock_resp.read.return_value = json.dumps([
+        {"model": "claude-3-5", "calls": 12, "avg_latency_ms": 150, "input_tokens": 500, "output_tokens": 200, "passes": 10, "fails": 2}
+    ]).encode("utf-8")
+    mock_resp.__enter__.return_value = mock_resp
+
+    with patch("urllib.request.urlopen", return_value=mock_resp) as mock_urlopen:
+        ret = cmd_usage(mock_args)
+        req = mock_urlopen.call_args[0][0]
+        assert req.headers.get("X-admin-token") == "valid-secret"
+
+    assert ret == 0
+    out = capsys.readouterr().out
+    assert "claude-3-5" in out
+    assert "Developer: Entire Team" in out
+
+
