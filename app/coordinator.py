@@ -25,39 +25,52 @@ from app.routing import resolve_route
 
 logger = logging.getLogger("observer.coordinator")
 
+
+class SpecialistExecutionError(Exception):
+    """Raised when all candidate models for a specialist fail to execute."""
+
+    def __init__(self, specialist_key: str, message: str, status_code: int = 502):
+        super().__init__(message)
+        self.specialist_key = specialist_key
+        self.message = message
+        self.status_code = status_code
+
+
 # ────────── Permissive Open-Source Specialist Registry ──────────
 SPECIALIST_CATALOG = {
     "fast_coder": {
-        "model": "qwen2.5-coder:1.5b",
+        "model": "local/qwen2.5-coder:1.5b",
         "fallback_model": "qwen/qwen-2.5-coder-32b-instruct",
         "role": "Fast code generation and syntax synthesis (Apache 2.0)",
         "license": "Apache 2.0"
     },
     "heavy_coder": {
-        "model": "qwen2.5-coder:7b",
+        "model": "local/qwen2.5-coder:7b",
         "fallback_model": "qwen/qwen-2.5-coder-32b-instruct",
         "role": "Complex systems refactoring and multi-file codebases (Apache 2.0)",
         "license": "Apache 2.0"
     },
     "deep_reasoner": {
-        "model": "deepseek-r1:7b",
-        "fallback_model": "deepseek/deepseek-r1",
+        "model": "local/deepseek-r1:7b",
+        "fallback_model": "deepseek-reasoner",
+        "cloud_fallback": "qwen/qwen-2.5-coder-32b-instruct",
         "role": "Step-by-step chain-of-thought, algorithm design & reasoning (MIT)",
         "license": "MIT"
     },
     "math_specialist": {
-        "model": "qwen2.5-math:7b",
+        "model": "local/qwen2.5-math:7b",
         "fallback_model": "qwen/qwen-2.5-coder-32b-instruct",
         "role": "Mathematical proofs, numerical formulas & algorithmic proofs (Apache 2.0)",
         "license": "Apache 2.0"
     },
     "vision_specialist": {
-        "model": "qwen2-vl:7b",
+        "model": "local/qwen2-vl:7b",
         "fallback_model": "qwen/qwen-2-vl-72b-instruct",
         "role": "UI screenshot analysis and visual inspection (Apache 2.0)",
         "license": "Apache 2.0"
     }
 }
+
 
 REASONING_KEYWORDS = {
     "architecture", "architect", "design pattern", "system design", "trade-off",
@@ -140,13 +153,16 @@ async def call_specialist(
     temperature: float = 0.2,
     max_tokens: Optional[int] = None,
     routes_map: Optional[Dict[str, Any]] = None,
-    custom_system_prompt: Optional[str] = None
+    custom_system_prompt: Optional[str] = None,
+    client_auth_header: Optional[str] = None,
 ) -> Tuple[str, int, int]:
     """
     Call a specialist model with resilient fallback:
-    1. Try local model route if configured (e.g. Ollama/vLLM on http://127.0.0.1:11434 or 8080).
+    1. Try local model route if configured (e.g. Ollama/vLLM on http://127.0.0.1:8080/v1).
     2. Gracefully fall back to open-weight upstream if local runtime is unreachable.
+    3. Forward client credentials (BYOK) if server environment credentials are missing.
     Returns: (text_content, input_tokens, output_tokens)
+    Raises: SpecialistExecutionError if all candidates fail.
     """
     spec = SPECIALIST_CATALOG.get(specialist_key, SPECIALIST_CATALOG["fast_coder"])
     primary_model = spec["model"]
@@ -160,6 +176,9 @@ async def call_specialist(
             payload_messages.insert(0, {"role": "system", "content": custom_system_prompt})
 
     candidate_models = [primary_model, fallback_model]
+    if "cloud_fallback" in spec and spec["cloud_fallback"] not in candidate_models:
+        candidate_models.append(spec["cloud_fallback"])
+
     last_err = None
 
     for target_model in candidate_models:
@@ -169,9 +188,14 @@ async def call_specialist(
         api_key = os.environ.get(route.get("api_key_env") or "")
         if api_key:
             headers["Authorization"] = f"Bearer {api_key}"
+        elif client_auth_header and not target_model.startswith("local/"):
+            headers["Authorization"] = client_auth_header
+
+        # Strip 'local/' prefix when transmitting model name to local runner
+        wire_model = target_model[6:] if target_model.startswith("local/") else target_model
 
         body = {
-            "model": target_model,
+            "model": wire_model,
             "messages": payload_messages,
             "temperature": temperature,
             "stream": False,
@@ -179,15 +203,28 @@ async def call_specialist(
         if max_tokens:
             body["max_tokens"] = max_tokens
 
+        # Fail fast on local endpoints (5s timeout) so cloud fallbacks are not stalled
+        timeout = 5.0 if target_model.startswith("local/") else 90.0
+
         try:
-            resp = await client.post(url, json=body, headers=headers, timeout=90.0)
+            resp = await client.post(url, json=body, headers=headers, timeout=timeout)
             if resp.status_code == 200:
-                data = resp.json()
-                content = data["choices"][0]["message"]["content"]
-                usage = data.get("usage", {})
-                in_tok = usage.get("prompt_tokens") or len(str(payload_messages)) // 4
-                out_tok = usage.get("completion_tokens") or len(content) // 4
-                return content, in_tok, out_tok
+                try:
+                    data = resp.json()
+                    choices = data.get("choices")
+                    if choices and len(choices) > 0:
+                        msg = choices[0].get("message") or {}
+                        content = msg.get("content", "")
+                        if content:
+                            usage = data.get("usage", {})
+                            in_tok = usage.get("prompt_tokens") or len(str(payload_messages)) // 4
+                            out_tok = usage.get("completion_tokens") or len(content) // 4
+                            return content, in_tok, out_tok
+                    last_err = f"Upstream '{target_model}' returned 200 but response missing choices/content"
+                    logger.warning(last_err)
+                except Exception as parse_err:
+                    last_err = f"Upstream '{target_model}' returned invalid JSON: {parse_err}"
+                    logger.warning(last_err)
             else:
                 last_err = f"HTTP {resp.status_code}: {resp.text[:200]}"
                 logger.warning(f"Specialist '{target_model}' returned {resp.status_code}; trying candidate...")
@@ -195,9 +232,12 @@ async def call_specialist(
             last_err = str(e)
             logger.warning(f"Specialist call to '{target_model}' on '{url}' failed: {e}; trying candidate...")
 
-    # If all remote endpoints failed in mock or test environment, generate clean synthesis
+    # All candidate models failed - raise informative error rather than returning fake 200
     logger.error(f"All specialist candidates failed for {specialist_key}. Last error: {last_err}")
-    return f"// [ObserverCoder-1.0 - {spec['role']}]\n// Generated solution via ObserverCoder pipeline.\n", 10, 10
+    raise SpecialistExecutionError(
+        specialist_key=specialist_key,
+        message=f"All specialist candidates failed for {specialist_key}. Last error: {last_err}"
+    )
 
 
 async def coordinate_request(
@@ -226,69 +266,130 @@ async def coordinate_request(
 
     logger.info(f"ObserverCoder-1.0 activated: track='{track}', specialists={specialists}, reason='{reason}'")
 
+    # Extract client authorization if provided (BYOK fallback when server env key is absent)
+    observer_token = os.environ.get("OBSERVER_AUTH_TOKEN") or os.environ.get("OBSERVER_TOKEN")
+    client_raw = request.headers.get("authorization", "").strip() or request.headers.get("x-api-key", "").strip()
+    client_auth = None
+    if client_raw:
+        parts = client_raw.split(None, 1)
+        raw_key = parts[1] if (len(parts) == 2 and parts[0].lower() == "bearer") else client_raw
+        if not (observer_token and raw_key == observer_token):
+            client_auth = client_raw if client_raw.lower().startswith("bearer ") else f"Bearer {client_raw}"
+
     total_in = 0
     total_out = 0
     final_text = ""
     reasoning_blueprint = ""
 
-    if track == "two_pass_reasoning":
-        reasoner_key = specialists[0]
-        coder_key = specialists[1] if len(specialists) > 1 else "fast_coder"
+    try:
+        if track == "two_pass_reasoning":
+            reasoner_key = specialists[0]
+            coder_key = specialists[1] if len(specialists) > 1 else "fast_coder"
 
-        # Pass 1: Reasoner analyzes problem and outputs architectural strategy
-        reasoning_prompt = (
-            "You are the Architectural & Reasoning Specialist for ObserverCoder-1.0. "
-            "Analyze the problem thoroughly. Provide a concise, step-by-step implementation plan, "
-            "algorithmic design, and identify edge cases. Do NOT write full code, focus on the strategy."
-        )
-        plan, in1, out1 = await call_specialist(
-            client=client,
-            specialist_key=reasoner_key,
-            messages=messages,
-            temperature=0.3,
-            max_tokens=600,
-            routes_map=routes_map,
-            custom_system_prompt=reasoning_prompt
-        )
-        total_in += in1
-        total_out += out1
-        reasoning_blueprint = plan
+            # Pass 1: Reasoner analyzes problem and outputs architectural strategy
+            reasoning_prompt = (
+                "You are the Architectural & Reasoning Specialist for ObserverCoder-1.0. "
+                "Analyze the problem thoroughly. Provide a concise, step-by-step implementation plan, "
+                "algorithmic design, and identify edge cases. Do NOT write full code, focus on the strategy."
+            )
+            plan, in1, out1 = await call_specialist(
+                client=client,
+                specialist_key=reasoner_key,
+                messages=messages,
+                temperature=0.3,
+                max_tokens=600,
+                routes_map=routes_map,
+                custom_system_prompt=reasoning_prompt,
+                client_auth_header=client_auth,
+            )
+            total_in += in1
+            total_out += out1
+            reasoning_blueprint = plan
 
-        # Pass 2: Coder implements the solution based on the reasoning blueprint
-        coder_system = (
-            "You are the Lead Code Synthesis Specialist for ObserverCoder-1.0. "
-            f"Here is the verified architectural strategy from our Reasoning Specialist:\n\n"
-            f"<strategy>\n{reasoning_blueprint}\n</strategy>\n\n"
-            "Now write clean, modular, production-ready code implementing this exact plan. "
-            "Include brief explanations where helpful."
-        )
-        code_res, in2, out2 = await call_specialist(
-            client=client,
-            specialist_key=coder_key,
-            messages=messages,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            routes_map=routes_map,
-            custom_system_prompt=coder_system
-        )
-        total_in += in2
-        total_out += out2
-        final_text = code_res
+            # Pass 2: Coder implements the solution based on the reasoning blueprint
+            coder_system = (
+                "You are the Lead Code Synthesis Specialist for ObserverCoder-1.0. "
+                f"Here is the verified architectural strategy from our Reasoning Specialist:\n\n"
+                f"<strategy>\n{reasoning_blueprint}\n</strategy>\n\n"
+                "Now write clean, modular, production-ready code implementing this exact plan. "
+                "Include brief explanations where helpful."
+            )
+            code_res, in2, out2 = await call_specialist(
+                client=client,
+                specialist_key=coder_key,
+                messages=messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                routes_map=routes_map,
+                custom_system_prompt=coder_system,
+                client_auth_header=client_auth,
+            )
+            total_in += in2
+            total_out += out2
+            final_text = code_res
 
-    else:
-        # Fast direct track: Vision or Fast Coder
-        specialist_key = specialists[0]
-        res, in_tok, out_tok = await call_specialist(
-            client=client,
-            specialist_key=specialist_key,
-            messages=messages,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            routes_map=routes_map
+        else:
+            # Fast direct track: Vision or Fast Coder
+            specialist_key = specialists[0]
+            res, in_tok, out_tok = await call_specialist(
+                client=client,
+                specialist_key=specialist_key,
+                messages=messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                routes_map=routes_map,
+                client_auth_header=client_auth,
+            )
+            total_in += in_tok
+            total_out += out_tok
+            final_text = res
+
+    except SpecialistExecutionError as err:
+        latency_ms = int((time.perf_counter() - t0) * 1000)
+        task_id = request.headers.get("x-task-id") or str(uuid.uuid4())
+        call_meta = {
+            "id": str(uuid.uuid4()),
+            "project": project or request.headers.get("x-project"),
+            "task_id": task_id,
+            "session_id": request.headers.get("x-session-id") or request.headers.get("x-user"),
+            "task_type": "coding:observercoder_coordinated",
+            "model": "observer-coder-1.0",
+            "upstream": "internal:coordinator",
+            "style": "openai",
+            "streamed": streamed,
+            "request": body,
+            "response_text": "",
+            "tool_calls": [],
+            "status_code": 502,
+            "latency_ms": latency_ms,
+            "error": err.message,
+            "in": 0,
+            "out": 0,
+        }
+        if log_call_fn:
+            try:
+                await log_call_fn(call_meta)
+            except Exception as log_err:
+                logger.warning(f"Coordinator error logging notice: {log_err}")
+
+        error_headers = {
+            "x-observer-model": "observer-coder-1.0",
+            "x-observer-track": track,
+            "x-observer-specialists": ",".join(specialists),
+            "x-observer-latency-ms": str(latency_ms),
+        }
+        return JSONResponse(
+            {
+                "error": {
+                    "message": f"ObserverCoder specialist execution failed: {err.message}",
+                    "type": "upstream_specialist_error",
+                    "code": 502,
+                    "specialist": err.specialist_key,
+                }
+            },
+            status_code=502,
+            headers=error_headers,
         )
-        total_in += in_tok
-        total_out += out_tok
-        final_text = res
 
     latency_ms = int((time.perf_counter() - t0) * 1000)
 

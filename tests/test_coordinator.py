@@ -6,7 +6,7 @@ import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
 import httpx
 import main
-from app.coordinator import analyze_intent, call_specialist, SPECIALIST_CATALOG
+from app.coordinator import analyze_intent, call_specialist, SPECIALIST_CATALOG, SpecialistExecutionError
 
 
 def test_analyze_intent_fast_coding():
@@ -187,3 +187,137 @@ async def test_v1_models_endpoint_lists_observer_coder(async_client):
     data = resp.json()
     model_ids = [m["id"] for m in data["data"]]
     assert "observer-coder-1.0" in model_ids
+
+
+@pytest.mark.asyncio
+async def test_call_specialist_primary_fails_fallback_succeeds():
+    mock_client = AsyncMock()
+
+    fail_resp = MagicMock()
+    fail_resp.status_code = 500
+    fail_resp.text = "Internal Server Error"
+
+    success_resp = MagicMock()
+    success_resp.status_code = 200
+    success_resp.json.return_value = {
+        "choices": [{"message": {"content": "def fallback_solution(): return True"}}],
+        "usage": {"prompt_tokens": 12, "completion_tokens": 6}
+    }
+
+    mock_client.post.side_effect = [fail_resp, success_resp]
+
+    text, in_tok, out_tok = await call_specialist(
+        client=mock_client,
+        specialist_key="fast_coder",
+        messages=[{"role": "user", "content": "test"}]
+    )
+    assert text == "def fallback_solution(): return True"
+    assert in_tok == 12
+    assert out_tok == 6
+    assert mock_client.post.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_call_specialist_all_fail_raises_exception():
+    mock_client = AsyncMock()
+
+    fail_resp = MagicMock()
+    fail_resp.status_code = 401
+    fail_resp.text = '{"error": "Unauthorized"}'
+
+    mock_client.post.return_value = fail_resp
+
+    with pytest.raises(SpecialistExecutionError) as exc_info:
+        await call_specialist(
+            client=mock_client,
+            specialist_key="fast_coder",
+            messages=[{"role": "user", "content": "test"}]
+        )
+    assert "All specialist candidates failed for fast_coder" in str(exc_info.value)
+    assert exc_info.value.specialist_key == "fast_coder"
+
+
+@pytest.mark.asyncio
+async def test_call_specialist_forwards_client_auth():
+    mock_client = AsyncMock()
+
+    # First call (local) fails with connection error, second call (cloud fallback) succeeds
+    success_resp = MagicMock()
+    success_resp.status_code = 200
+    success_resp.json.return_value = {
+        "choices": [{"message": {"content": "client auth response"}}],
+        "usage": {"prompt_tokens": 10, "completion_tokens": 5}
+    }
+    mock_client.post.side_effect = [httpx.ConnectError("Connection refused"), success_resp]
+
+    routes_map = {
+        "local/": {"base_url": "http://127.0.0.1:8080/v1", "api_key_env": None},
+        "*": {"base_url": "https://openrouter.ai/api/v1", "api_key_env": "MISSING_ENV_KEY"}
+    }
+
+    text, in_tok, out_tok = await call_specialist(
+        client=mock_client,
+        specialist_key="fast_coder",
+        messages=[{"role": "user", "content": "test"}],
+        routes_map=routes_map,
+        client_auth_header="Bearer sk-or-custom-client-key"
+    )
+    assert text == "client auth response"
+    assert mock_client.post.call_count == 2
+    # Verify the fallback call to OpenRouter received the client BYOK header
+    second_call_headers = mock_client.post.call_args_list[1].kwargs.get("headers", {})
+    assert second_call_headers.get("Authorization") == "Bearer sk-or-custom-client-key"
+
+
+@pytest.mark.asyncio
+async def test_observer_coder_endpoint_failure_returns_502(async_client, monkeypatch):
+    mock_client = AsyncMock()
+    fail_resp = MagicMock()
+    fail_resp.status_code = 502
+    fail_resp.text = "Bad Gateway"
+    mock_client.post.return_value = fail_resp
+    monkeypatch.setattr(main, "client", mock_client)
+
+    payload = {
+        "model": "observer-coder-1.0",
+        "messages": [{"role": "user", "content": "Write quicksort in python"}],
+        "stream": False
+    }
+
+    resp = await async_client.post("/v1/chat/completions", json=payload)
+    assert resp.status_code == 502
+    data = resp.json()
+    assert "error" in data
+    assert data["error"]["code"] == 502
+    assert "ObserverCoder specialist execution failed" in data["error"]["message"]
+    # Ensure placeholder comment is NEVER returned on failure
+    assert "choices" not in data
+
+
+@pytest.mark.asyncio
+async def test_call_specialist_malformed_json_triggers_fallback():
+    mock_client = AsyncMock()
+
+    # First call returns 200 with invalid JSON
+    bad_json_resp = MagicMock()
+    bad_json_resp.status_code = 200
+    bad_json_resp.json.side_effect = json.JSONDecodeError("Expecting value", "doc", 0)
+
+    # Second call returns 200 with valid completion
+    valid_resp = MagicMock()
+    valid_resp.status_code = 200
+    valid_resp.json.return_value = {
+        "choices": [{"message": {"content": "recovered from bad json"}}],
+        "usage": {"prompt_tokens": 10, "completion_tokens": 5}
+    }
+
+    mock_client.post.side_effect = [bad_json_resp, valid_resp]
+
+    text, in_tok, out_tok = await call_specialist(
+        client=mock_client,
+        specialist_key="fast_coder",
+        messages=[{"role": "user", "content": "test"}]
+    )
+    assert text == "recovered from bad json"
+    assert mock_client.post.call_count == 2
+
