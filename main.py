@@ -818,11 +818,16 @@ async def stats(request: Request, session_id: Optional[str] = None, project: Opt
         return JSONResponse({"error": "unauthorized"}, status_code=401)
 
     is_admin = check_admin_auth(request)
-    dev_session = session_id or request.headers.get("x-session-id") or request.headers.get("x-user")
+    dev_header = request.headers.get("x-session-id") or request.headers.get("x-user")
+    dev_session = dev_header or session_id
 
     # If requester is not admin, enforce user isolation: they only see their own usage
-    effective_session = session_id
     if not is_admin:
+        if dev_header and session_id and session_id != dev_header:
+            return JSONResponse(
+                {"error": "forbidden: you cannot access other developers' statistics"},
+                status_code=403
+            )
         effective_session = dev_session
         if not effective_session:
             if os.environ.get("OBSERVER_ADMIN_KEY") or os.environ.get("OBSERVER_AUTH_TOKEN"):
@@ -830,7 +835,8 @@ async def stats(request: Request, session_id: Optional[str] = None, project: Opt
                     {"error": "unauthorized: admin privileges or developer session_id required"},
                     status_code=401
                 )
-            effective_session = session_id
+    else:
+        effective_session = session_id
 
     if pool is None:
         return JSONResponse({"error": "database uninitialized"}, status_code=503)
@@ -971,21 +977,71 @@ async def list_tasks(request: Request, limit: int = 50, session_id: Optional[str
         return JSONResponse({"error": "database uninitialized"}, status_code=503)
 
     is_admin = check_admin_auth(request)
-    dev_session = session_id or request.headers.get("x-session-id") or request.headers.get("x-user")
-    effective_session = session_id if is_admin else dev_session
+    dev_header = request.headers.get("x-session-id") or request.headers.get("x-user")
+    dev_session = dev_header or session_id
+
+    if not is_admin:
+        if dev_header and session_id and session_id != dev_header:
+            return JSONResponse(
+                {"error": "forbidden: you cannot access other developers' tasks"},
+                status_code=403
+            )
+        effective_session = dev_session
+        if not effective_session:
+            if os.environ.get("OBSERVER_ADMIN_KEY") or os.environ.get("OBSERVER_AUTH_TOKEN"):
+                return JSONResponse(
+                    {"error": "unauthorized: admin privileges or developer session_id required"},
+                    status_code=401
+                )
+    else:
+        effective_session = session_id
 
     return await fetch_tasks(pool, limit, session_id=effective_session)
 
 
 @app.get("/tasks/{task_id}")
-async def get_task_trace(task_id: str, request: Request):
+async def get_task_trace(task_id: str, request: Request, session_id: Optional[str] = None):
     if not check_auth(request):
         return JSONResponse({"error": "unauthorized"}, status_code=401)
     if pool is None:
         return JSONResponse({"error": "database uninitialized"}, status_code=503)
+
+    is_admin = check_admin_auth(request)
+    dev_header = request.headers.get("x-session-id") or request.headers.get("x-user")
+    dev_session = dev_header or session_id
+
     data = await fetch_task_details(pool, task_id)
     if data is None:
         return JSONResponse({"error": "task not found"}, status_code=404)
+
+    # RBAC: If requester is not admin, enforce ownership isolation
+    if not is_admin:
+        if dev_header and session_id and session_id != dev_header:
+            return JSONResponse(
+                {"error": "forbidden: you cannot access other developers' task traces"},
+                status_code=403
+            )
+        effective_session = dev_session
+        if not effective_session:
+            if os.environ.get("OBSERVER_ADMIN_KEY") or os.environ.get("OBSERVER_AUTH_TOKEN"):
+                return JSONResponse(
+                    {"error": "unauthorized: admin privileges or developer session_id required"},
+                    status_code=401
+                )
+        else:
+            task_sessions = data.get("sessions") or []
+            task_owner = data.get("task", {}).get("session_id")
+            if task_sessions and effective_session not in task_sessions:
+                return JSONResponse(
+                    {"error": "forbidden: you cannot access other developers' task traces"},
+                    status_code=403
+                )
+            if task_owner and task_owner != effective_session and not task_sessions:
+                return JSONResponse(
+                    {"error": "forbidden: you cannot access other developers' task traces"},
+                    status_code=403
+                )
+
     return data
 
 
@@ -1016,9 +1072,23 @@ async def user_profile_endpoint(request: Request, user: Optional[str] = None):
         return JSONResponse({"error": "unauthorized"}, status_code=401)
     if pool is None:
         return JSONResponse({"error": "database uninitialized"}, status_code=503)
-    target_user = user or request.headers.get("x-session-id") or request.headers.get("x-user")
+
+    is_admin = check_admin_auth(request)
+    dev_header = request.headers.get("x-session-id") or request.headers.get("x-user")
+
+    if not is_admin:
+        if dev_header and user and user != dev_header:
+            return JSONResponse(
+                {"error": "forbidden: you cannot access other developers' profiles"},
+                status_code=403
+            )
+        target_user = dev_header or user
+    else:
+        target_user = user or dev_header
+
     if not target_user:
         return JSONResponse({"error": "user parameter or X-Session-Id header required"}, status_code=400)
+
     profile = await fetch_developer_profile(pool, target_user)
     return {"ok": True, "profile": profile}
 
@@ -1032,7 +1102,29 @@ async def stats_timeseries(request: Request, days: int = 7, session_id: Optional
         return JSONResponse({"error": "database uninitialized"}, status_code=503)
     if days < 1 or days > 365:
         return JSONResponse({"error": "days must be between 1 and 365"}, status_code=400)
-    data = await fetch_timeseries_stats(pool, days=days, session_id=session_id, project=project)
+
+    is_admin = check_admin_auth(request)
+    dev_header = request.headers.get("x-session-id") or request.headers.get("x-user")
+    dev_session = dev_header or session_id
+
+    # If requester is not admin, enforce user isolation: they only see their own timeseries
+    if not is_admin:
+        if dev_header and session_id and session_id != dev_header:
+            return JSONResponse(
+                {"error": "forbidden: you cannot access other developers' timeseries"},
+                status_code=403
+            )
+        effective_session = dev_session
+        if not effective_session:
+            if os.environ.get("OBSERVER_ADMIN_KEY") or os.environ.get("OBSERVER_AUTH_TOKEN"):
+                return JSONResponse(
+                    {"error": "unauthorized: admin privileges or developer session_id required"},
+                    status_code=401
+                )
+    else:
+        effective_session = session_id
+
+    data = await fetch_timeseries_stats(pool, days=days, session_id=effective_session, project=project)
     return {"ok": True, "days": days, "series": data}
 
 
@@ -1093,8 +1185,8 @@ async def export_dataset_endpoint(payload: DatasetExportRequest, request: Reques
 @app.get("/admin/dataset/stats")
 async def dataset_stats_endpoint(request: Request, project: Optional[str] = None):
     """Inspect dataset curation potential and verified sample counts."""
-    if not check_auth(request):
-        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    if not check_admin_auth(request):
+        return JSONResponse({"error": "unauthorized: admin privileges required"}, status_code=401)
     if pool is None:
         return JSONResponse({"error": "database uninitialized"}, status_code=503)
 

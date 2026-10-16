@@ -144,7 +144,7 @@ async def fetch_task_details(pool: asyncpg.Pool, task_id: str) -> Optional[Dict[
         if not task_row:
             return None
         call_rows = await c.fetch("""
-            SELECT id, ts, model, upstream, api_style, streamed, status_code, latency_ms, input_tokens, output_tokens, error
+            SELECT id, ts, session_id, model, upstream, api_style, streamed, status_code, latency_ms, input_tokens, output_tokens, error
             FROM llm_calls WHERE task_id = $1 ORDER BY ts ASC
         """, task_id)
         outcome_rows = await c.fetch("""
@@ -156,6 +156,7 @@ async def fetch_task_details(pool: asyncpg.Pool, task_id: str) -> Optional[Dict[
     if t_dict.get("created_at"):
         t_dict["created_at"] = t_dict["created_at"].isoformat()
 
+    sessions = []
     calls = []
     for r in call_rows:
         cd = dict(r)
@@ -163,7 +164,12 @@ async def fetch_task_details(pool: asyncpg.Pool, task_id: str) -> Optional[Dict[
             cd["id"] = str(cd["id"])
         if cd.get("ts"):
             cd["ts"] = cd["ts"].isoformat()
+        if cd.get("session_id") and cd["session_id"] not in sessions:
+            sessions.append(cd["session_id"])
         calls.append(cd)
+
+    if sessions:
+        t_dict["session_id"] = sessions[0]
 
     outcomes = []
     for r in outcome_rows:
@@ -177,7 +183,7 @@ async def fetch_task_details(pool: asyncpg.Pool, task_id: str) -> Optional[Dict[
                 pass
         outcomes.append(od)
 
-    return {"task": t_dict, "calls": calls, "outcomes": outcomes}
+    return {"task": t_dict, "calls": calls, "outcomes": outcomes, "sessions": sessions}
 
 
 async def prune_records(pool: asyncpg.Pool, days: int) -> Dict[str, str]:

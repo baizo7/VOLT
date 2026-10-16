@@ -82,8 +82,11 @@ DASHBOARD_HTML = """<!DOCTYPE html>
   <div class="flex items-center gap-2.5">
     <div class="h-8 w-8 rounded-lg bg-indigo-500/15 text-indigo-400 flex items-center justify-center text-sm border border-indigo-500/25">👤</div>
     <div>
-      <p class="text-[10px] font-bold uppercase tracking-wider text-indigo-400">Personal Dashboard</p>
-      <p class="text-xs font-bold text-white leading-tight" id="banner-user-name">dev</p>
+      <p class="text-[10px] font-bold uppercase tracking-wider text-indigo-400">Personal Developer Workspace</p>
+      <div class="flex items-center gap-2 mt-0.5">
+        <span class="text-xs font-bold text-white leading-tight" id="banner-user-name">dev</span>
+        <span class="text-[9px] font-semibold px-2 py-0.5 rounded-full bg-emerald-950/70 text-emerald-400 border border-emerald-800/60">🔒 Isolated View — Private Metrics</span>
+      </div>
     </div>
   </div>
   <div class="flex items-center gap-2 text-[10px]">
@@ -298,12 +301,12 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       <button id="tab-btn-admin" onclick="switchModalTab('admin')" class="py-2 rounded-md text-slate-400 hover:text-white transition">👑 Admin</button>
     </div>
     <div id="modal-tab-dev" class="space-y-3">
-      <p class="text-[11px] text-slate-400">View your personal usage, configured API key, and tasks.</p>
+      <p class="text-[11px] text-slate-400">Log in with your developer name. You will view <strong>strictly your own</strong> personal metrics, private traces, and masked API key. Other users cannot see your data, and you cannot see theirs.</p>
       <input id="modal-input-user" type="text" placeholder="Your developer name (e.g. alex)" class="w-full px-3 py-2 text-xs bg-surface-950 border border-surface-700 rounded-lg text-white focus:outline-none focus:border-indigo-500">
       <button onclick="submitDeveloperLogin()" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 font-bold text-[11px] text-white rounded-lg transition shadow-md">Enter Personal Dashboard</button>
     </div>
     <div id="modal-tab-admin" class="space-y-3 hidden">
-      <p class="text-[11px] text-slate-400">Access full system visibility, connected developers, and export tools.</p>
+      <p class="text-[11px] text-slate-400">Log in with administrator key. Grants <strong>full global team visibility</strong> across all connected developers, total token consumption, system-wide task traces, and dataset curation exports.</p>
       <input id="modal-input-admin-key" type="password" placeholder="Enter OBSERVER_ADMIN_KEY" class="w-full px-3 py-2 text-xs bg-surface-950 border border-surface-700 rounded-lg text-white focus:outline-none focus:border-indigo-500">
       <button onclick="submitAdminLogin()" class="w-full py-2.5 bg-violet-600 hover:bg-violet-500 font-bold text-[11px] text-white rounded-lg transition shadow-md">Unlock Admin Dashboard</button>
     </div>
@@ -358,17 +361,20 @@ function updateUIForRole() {
   const adminSec = document.getElementById('admin-developers-section');
   const exportTab = document.getElementById('tab-export');
   if (S.role === 'admin') {
-    badge.className = "px-2 py-0.5 text-[10px] font-bold rounded-full bg-violet-950/60 text-violet-300 border border-violet-800/50";
-    badge.textContent = "👑 Admin";
+    badge.className = "px-2.5 py-0.5 text-[10px] font-bold rounded-full bg-violet-950/60 text-violet-300 border border-violet-800/50 flex items-center gap-1";
+    badge.textContent = "👑 Admin (Global View)";
     banner.classList.add('hidden');
     adminSec.classList.remove('hidden');
     exportTab.style.display = '';
   } else {
-    badge.className = "px-2 py-0.5 text-[10px] font-bold rounded-full bg-cyan-950/60 text-cyan-300 border border-cyan-800/50";
-    badge.textContent = "👤 " + S.user;
+    badge.className = "px-2.5 py-0.5 text-[10px] font-bold rounded-full bg-cyan-950/60 text-cyan-300 border border-cyan-800/50 flex items-center gap-1";
+    badge.innerHTML = "👤 Developer: " + S.user + " <span class='text-[9px] text-cyan-400 font-normal'>(Private View)</span>";
     banner.classList.remove('hidden');
     adminSec.classList.add('hidden');
     exportTab.style.display = 'none';
+    if (document.getElementById('panel-export') && !document.getElementById('panel-export').classList.contains('hidden')) {
+      switchTab('overview');
+    }
     document.getElementById('banner-user-name').textContent = S.user;
   }
 }
@@ -390,7 +396,12 @@ function switchTab(t) {
 // ────────── Fetch Data ──────────
 function authHeaders() {
   let h = {};
-  if (S.adminToken) { h['X-Admin-Token'] = S.adminToken; h['Authorization'] = 'Bearer ' + S.adminToken; }
+  if (S.adminToken) {
+    h['X-Admin-Token'] = S.adminToken;
+    h['Authorization'] = 'Bearer ' + S.adminToken;
+  } else if (S.user) {
+    h['X-Session-Id'] = S.user;
+  }
   return h;
 }
 async function fetchData() {
@@ -420,7 +431,7 @@ async function fetchAdminDevelopers(h) {
   try { const r = await fetch('/admin/connected-users',{headers:h}); if (r.ok) { const d = await r.json(); renderDevelopers(d.users||[]); } } catch(e) {}
 }
 async function fetchUserProfile(u) {
-  try { const r = await fetch('/user/profile?user='+encodeURIComponent(u)); if (r.ok) { const d = await r.json(); const p=d.profile||{}; document.getElementById('banner-masked-key').textContent=p.key_masked||'—'; document.getElementById('banner-provider').textContent=(p.provider||'—').toUpperCase(); } } catch(e) {}
+  try { const r = await fetch('/user/profile?user='+encodeURIComponent(u), {headers:authHeaders()}); if (r.ok) { const d = await r.json(); const p=d.profile||{}; document.getElementById('banner-masked-key').textContent=p.key_masked||'—'; document.getElementById('banner-provider').textContent=(p.provider||'—').toUpperCase(); } } catch(e) {}
 }
 let currentChartDays = 7;
 let currentGraphMode = 'activity';
@@ -518,7 +529,11 @@ async function openTracePanel(taskId) {
   content.innerHTML = '<p class="text-xs text-slate-500 animate-pulse">Loading trace data...</p>';
   try {
     const r = await fetch('/tasks/'+encodeURIComponent(taskId), {headers:authHeaders()});
-    if (!r.ok) { content.innerHTML = '<p class="text-xs text-rose-400">Failed to load trace.</p>'; return; }
+    if (!r.ok) {
+      const err = r.status === 403 ? '🔒 Access Forbidden: this trace belongs to another developer.' : 'Failed to load trace.';
+      content.innerHTML = `<div class="p-3 bg-rose-950/40 border border-rose-800/50 rounded-lg text-rose-300 text-xs">${err}</div>`;
+      return;
+    }
     const d = await r.json();
     let html = '';
     // Task Info

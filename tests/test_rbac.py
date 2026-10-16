@@ -157,3 +157,148 @@ async def test_stats_user_isolation(async_client, monkeypatch):
     data = resp.json()
     assert len(data) == 1
     assert data[0]["model"] == "gemini-3.1-flash-lite-preview"
+
+
+@pytest.mark.asyncio
+async def test_task_trace_rbac_isolation(async_client, monkeypatch):
+    monkeypatch.setenv("OBSERVER_ADMIN_KEY", "admin-key")
+
+    mock_pool = MagicMock()
+    mock_conn = MagicMock()
+    mock_conn.fetchrow = AsyncMock(return_value={
+        "task_id": "task_secret",
+        "project": "security-audit",
+        "task_type": "coding",
+        "title": "Fix vuln",
+        "created_at": None,
+    })
+    def make_mock_fetch():
+        return AsyncMock(side_effect=[
+            [{
+                "id": "c1",
+                "ts": None,
+                "session_id": "alice",
+                "model": "qwen2.5-coder-7b",
+                "upstream": "https://api.openai.com",
+                "api_style": "openai",
+                "streamed": False,
+                "status_code": 200,
+                "latency_ms": 120,
+                "input_tokens": 50,
+                "output_tokens": 100,
+                "error": None,
+            }],
+            [{
+                "id": 1,
+                "kind": "test",
+                "status": "pass",
+                "details": "{}",
+                "created_at": None,
+            }],
+        ])
+
+    mock_acquire = MagicMock()
+    mock_acquire.__aenter__.return_value = mock_conn
+    mock_acquire.__aexit__ = AsyncMock(return_value=None)
+    mock_pool.acquire.return_value = mock_acquire
+    monkeypatch.setattr(main, "pool", mock_pool)
+
+    # 1. Bob attempts to view Alice's task trace -> 403 Forbidden
+    mock_conn.fetch = make_mock_fetch()
+    resp_bob = await async_client.get("/tasks/task_secret", headers={"X-Session-Id": "bob"})
+    assert resp_bob.status_code == 403
+    assert "cannot access other developers' task traces" in resp_bob.json()["error"]
+
+    # 2. Anonymous/no-session request without admin key -> 401 Unauthorized
+    mock_conn.fetch = make_mock_fetch()
+    resp_anon = await async_client.get("/tasks/task_secret")
+    assert resp_anon.status_code == 401
+
+    # 3. Alice views her own task trace -> 200 OK
+    mock_conn.fetch = make_mock_fetch()
+    resp_alice = await async_client.get("/tasks/task_secret", headers={"X-Session-Id": "alice"})
+    assert resp_alice.status_code == 200
+    assert resp_alice.json()["task"]["task_id"] == "task_secret"
+
+    # 4. Admin views the task trace -> 200 OK
+    mock_conn.fetch = make_mock_fetch()
+    resp_admin = await async_client.get("/tasks/task_secret", headers={"X-Admin-Token": "admin-key"})
+    assert resp_admin.status_code == 200
+    assert resp_admin.json()["task"]["task_id"] == "task_secret"
+
+
+@pytest.mark.asyncio
+async def test_session_spoofing_prevention(async_client, monkeypatch):
+    monkeypatch.setenv("OBSERVER_ADMIN_KEY", "admin-key")
+
+    mock_pool = MagicMock()
+    mock_conn = MagicMock()
+    mock_conn.fetch = AsyncMock(return_value=[])
+    mock_acquire = MagicMock()
+    mock_acquire.__aenter__.return_value = mock_conn
+    mock_acquire.__aexit__ = AsyncMock(return_value=None)
+    mock_pool.acquire.return_value = mock_acquire
+    monkeypatch.setattr(main, "pool", mock_pool)
+
+    alice_headers = {"X-Session-Id": "alice"}
+
+    # /stats: Alice cannot snoop on Bob's statistics
+    resp = await async_client.get("/stats?session_id=bob", headers=alice_headers)
+    assert resp.status_code == 403
+    assert "cannot access other developers' statistics" in resp.json()["error"]
+
+    # /tasks: Alice cannot snoop on Bob's tasks
+    resp = await async_client.get("/tasks?session_id=bob", headers=alice_headers)
+    assert resp.status_code == 403
+    assert "cannot access other developers' tasks" in resp.json()["error"]
+
+    # /stats/timeseries: Alice cannot snoop on Bob's timeseries
+    resp = await async_client.get("/stats/timeseries?session_id=bob", headers=alice_headers)
+    assert resp.status_code == 403
+    assert "cannot access other developers' timeseries" in resp.json()["error"]
+
+    # /user/profile: Alice cannot view Bob's profile
+    resp = await async_client.get("/user/profile?user=bob", headers=alice_headers)
+    assert resp.status_code == 403
+    assert "cannot access other developers' profiles" in resp.json()["error"]
+
+
+@pytest.mark.asyncio
+async def test_admin_global_access_and_dataset_stats(async_client, monkeypatch):
+    monkeypatch.setenv("OBSERVER_ADMIN_KEY", "admin-key")
+
+    mock_pool = MagicMock()
+    mock_conn = MagicMock()
+    mock_conn.fetch = AsyncMock(return_value=[])
+    mock_acquire = MagicMock()
+    mock_acquire.__aenter__.return_value = mock_conn
+    mock_acquire.__aexit__ = AsyncMock(return_value=None)
+    mock_pool.acquire.return_value = mock_acquire
+    monkeypatch.setattr(main, "pool", mock_pool)
+
+    # 1. Non-admin attempting to access /admin/dataset/stats is rejected
+    resp = await async_client.get("/admin/dataset/stats")
+    assert resp.status_code == 401
+
+    # 2. Admin can access /admin/dataset/stats
+    monkeypatch.setattr("main.export_sft_dataset", AsyncMock(return_value=[]))
+    monkeypatch.setattr("main.export_dpo_dataset", AsyncMock(return_value=[]))
+    resp = await async_client.get("/admin/dataset/stats", headers={"X-Admin-Token": "admin-key"})
+    assert resp.status_code == 200
+    assert resp.json()["ok"] is True
+
+    # 3. Admin can view any user profile
+    mock_conn.fetchrow = AsyncMock(return_value={
+        "session_id": "bob",
+        "project": "proj-b",
+        "key_masked": "sk-ant...1234",
+        "provider": "anthropic",
+        "models_used": ["claude-3-5-sonnet"],
+        "first_seen": None,
+        "last_seen": None,
+        "total_calls": 10,
+    })
+    resp = await async_client.get("/user/profile?user=bob", headers={"X-Admin-Token": "admin-key"})
+    assert resp.status_code == 200
+    assert resp.json()["profile"]["session_id"] == "bob"
+
