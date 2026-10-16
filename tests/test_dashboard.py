@@ -8,12 +8,12 @@ import main
 async def test_dashboard_and_root_view(async_client):
     resp = await async_client.get("/dashboard")
     assert resp.status_code == 200
-    assert "AI Model Observer" in resp.text
+    assert "VOLT-AI" in resp.text
     assert "Model Performance Leaderboard" in resp.text
 
     root_resp = await async_client.get("/")
     assert root_resp.status_code == 200
-    assert "AI Model Observer" in root_resp.text
+    assert "VOLT-AI" in root_resp.text
 
 
 @pytest.mark.asyncio

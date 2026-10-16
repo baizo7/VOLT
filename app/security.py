@@ -132,11 +132,13 @@ def hash_api_key(key: Optional[str]) -> str:
 def check_admin_auth(request: Request) -> bool:
     """
     Verify whether the incoming request has valid Administrator access.
-    Strictly checks against OBSERVER_ADMIN_KEY, OBSERVER_ADMIN_TOKEN, or OBSERVER_AUTH_TOKEN.
+    Strictly checks against VOLT_ADMIN_KEY, OBSERVER_ADMIN_KEY, or tokens.
     Only the exact matching key will grant admin access.
     """
     admin_key = (
-        os.environ.get("OBSERVER_ADMIN_KEY")
+        os.environ.get("VOLT_ADMIN_KEY")
+        or os.environ.get("VOLT_ADMIN_TOKEN")
+        or os.environ.get("OBSERVER_ADMIN_KEY")
         or os.environ.get("OBSERVER_ADMIN_TOKEN")
         or os.environ.get("OBSERVER_AUTH_TOKEN")
     )
@@ -146,7 +148,11 @@ def check_admin_auth(request: Request) -> bool:
 
     admin_key = admin_key.strip()
 
-    # Candidate 1: X-Admin-Token header
+    # Candidate 1: X-Volt-Token or X-Admin-Token header
+    volt_header = request.headers.get("x-volt-token", "").strip()
+    if volt_header and secrets.compare_digest(volt_header, admin_key):
+        return True
+
     admin_header = request.headers.get("x-admin-token", "").strip()
     if admin_header and secrets.compare_digest(admin_header, admin_key):
         return True

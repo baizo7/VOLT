@@ -85,7 +85,7 @@ MATH_KEYWORDS = {
 }
 
 CODER_SYSTEM_INSTRUCTION = (
-    "You are ObserverCoder-1.0, an expert autonomous software engineer and full-stack developer.\n"
+    "You are VOLT-AI, an expert autonomous software engineer and full-stack developer.\n"
     "Your mission is to directly implement clean, complete, production-ready code that satisfies the user's request.\n"
     "\n"
     "CRITICAL RULES:\n"
@@ -272,7 +272,7 @@ async def coordinate_request(
     routes_map: Optional[Dict[str, Any]] = None,
 ) -> Response:
     """
-    ObserverCoder-1.0 unified coordination entrypoint.
+    VOLT-AI unified coordination entrypoint (with legacy ObserverCoder compatibility).
     Executes intent analysis, coordinates specialist worker models, and streams or returns standard response.
     """
     t0 = time.perf_counter()
@@ -281,12 +281,18 @@ async def coordinate_request(
     temperature = body.get("temperature", 0.2)
     max_tokens = body.get("max_tokens")
 
+    requested_model = body.get("model", "VOLT-AI")
+    if str(requested_model).lower().startswith("observer-coder"):
+        out_model = "observer-coder-1.0"
+    else:
+        out_model = "VOLT-AI"
+
     decision = analyze_intent(messages)
     track = decision["track"]
     specialists = decision["specialists"]
     reason = decision["reason"]
 
-    logger.info(f"ObserverCoder-1.0 activated: track='{track}', specialists={specialists}, reason='{reason}'")
+    logger.info(f"VOLT-AI activated ({out_model}): track='{track}', specialists={specialists}, reason='{reason}'")
 
     # Extract client authorization if provided (BYOK fallback when server env key is absent)
     observer_token = os.environ.get("OBSERVER_AUTH_TOKEN") or os.environ.get("OBSERVER_TOKEN")
@@ -385,8 +391,8 @@ async def coordinate_request(
             "project": project or request.headers.get("x-project"),
             "task_id": task_id,
             "session_id": request.headers.get("x-session-id") or request.headers.get("x-user"),
-            "task_type": "coding:observercoder_coordinated",
-            "model": "observer-coder-1.0",
+            "task_type": "coding:volt_coordinated",
+            "model": out_model,
             "upstream": "internal:coordinator",
             "style": "openai",
             "streamed": streamed,
@@ -406,15 +412,20 @@ async def coordinate_request(
                 logger.warning(f"Coordinator error logging notice: {log_err}")
 
         error_headers = {
-            "x-observer-model": "observer-coder-1.0",
+            "x-volt-model": out_model,
+            "x-observer-model": out_model,
+            "x-volt-track": track,
             "x-observer-track": track,
+            "x-volt-specialists": ",".join(specialists),
             "x-observer-specialists": ",".join(specialists),
+            "x-volt-latency-ms": str(latency_ms),
             "x-observer-latency-ms": str(latency_ms),
         }
+        brand_label = "ObserverCoder" if out_model == "observer-coder-1.0" else "VOLT-AI"
         return JSONResponse(
             {
                 "error": {
-                    "message": f"ObserverCoder specialist execution failed: {err.message}",
+                    "message": f"{brand_label} specialist execution failed: {err.message}",
                     "type": "upstream_specialist_error",
                     "code": 502,
                     "specialist": err.specialist_key,
@@ -426,15 +437,15 @@ async def coordinate_request(
 
     latency_ms = int((time.perf_counter() - t0) * 1000)
 
-    # Persist coordinated trace to Observer telemetry
+    # Persist coordinated trace to telemetry
     task_id = request.headers.get("x-task-id") or str(uuid.uuid4())
     call_meta = {
         "id": str(uuid.uuid4()),
         "project": project or request.headers.get("x-project"),
         "task_id": task_id,
         "session_id": request.headers.get("x-session-id") or request.headers.get("x-user"),
-        "task_type": "coding:observercoder_coordinated",
-        "model": "observer-coder-1.0",
+        "task_type": "coding:volt_coordinated",
+        "model": out_model,
         "upstream": "internal:coordinator",
         "style": "openai",
         "streamed": streamed,
@@ -459,9 +470,13 @@ async def coordinate_request(
     created_ts = int(time.time())
 
     headers = {
-        "x-observer-model": "observer-coder-1.0",
+        "x-volt-model": out_model,
+        "x-observer-model": out_model,
+        "x-volt-track": track,
         "x-observer-track": track,
+        "x-volt-specialists": ",".join(specialists),
         "x-observer-specialists": ",".join(specialists),
+        "x-volt-latency-ms": str(latency_ms),
         "x-observer-latency-ms": str(latency_ms),
     }
 
@@ -472,7 +487,7 @@ async def coordinate_request(
                 "id": resp_id,
                 "object": "chat.completion.chunk",
                 "created": created_ts,
-                "model": "observer-coder-1.0",
+                "model": out_model,
                 "choices": [{"index": 0, "delta": {"role": "assistant"}, "finish_reason": None}]
             }
             yield f"data: {json.dumps(first_chunk)}\n\n".encode("utf-8")
@@ -485,7 +500,7 @@ async def coordinate_request(
                     "id": resp_id,
                     "object": "chat.completion.chunk",
                     "created": created_ts,
-                    "model": "observer-coder-1.0",
+                    "model": out_model,
                     "choices": [{"index": 0, "delta": {"content": token_text}, "finish_reason": None}]
                 }
                 yield f"data: {json.dumps(chunk)}\n\n".encode("utf-8")
@@ -494,7 +509,7 @@ async def coordinate_request(
                 "id": resp_id,
                 "object": "chat.completion.chunk",
                 "created": created_ts,
-                "model": "observer-coder-1.0",
+                "model": out_model,
                 "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}]
             }
             yield f"data: {json.dumps(final_chunk)}\n\n".encode("utf-8")
@@ -506,11 +521,19 @@ async def coordinate_request(
             headers=headers
         )
 
+    coordination_details = {
+        "track": track,
+        "specialists_used": specialists,
+        "reason": reason,
+        "latency_ms": latency_ms,
+        "has_reasoning_pass": bool(reasoning_blueprint)
+    }
+
     response_payload = {
         "id": resp_id,
         "object": "chat.completion",
         "created": created_ts,
-        "model": "observer-coder-1.0",
+        "model": out_model,
         "choices": [
             {
                 "index": 0,
@@ -526,13 +549,8 @@ async def coordinate_request(
             "completion_tokens": total_out,
             "total_tokens": total_in + total_out
         },
-        "observer_coordination": {
-            "track": track,
-            "specialists_used": specialists,
-            "reason": reason,
-            "latency_ms": latency_ms,
-            "has_reasoning_pass": bool(reasoning_blueprint)
-        }
+        "volt_coordination": coordination_details,
+        "observer_coordination": coordination_details
     }
 
     return JSONResponse(response_payload, headers=headers)

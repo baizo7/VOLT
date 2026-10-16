@@ -10,7 +10,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AI Model Observer</title>
+  <title>VOLT-AI — Multi-Model Coordination & Observability</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -56,13 +56,13 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 <header class="sticky top-0 z-40 glass border-b border-surface-700 px-4 md:px-6 py-3">
   <div class="max-w-[1440px] mx-auto flex flex-wrap items-center justify-between gap-3">
     <div class="flex items-center gap-3">
-      <div class="h-9 w-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center font-extrabold text-white text-sm shadow-lg shadow-indigo-500/20">O</div>
+      <div class="h-9 w-9 rounded-xl bg-gradient-to-tr from-amber-500 via-indigo-600 to-violet-600 flex items-center justify-center font-extrabold text-white text-base shadow-lg shadow-amber-500/20">⚡</div>
       <div>
         <div class="flex items-center gap-2">
-          <h1 class="text-lg font-bold tracking-tight text-white">AI Observer</h1>
+          <h1 class="text-lg font-bold tracking-tight text-white flex items-center"><span class="text-amber-400 font-black">VOLT</span><span class="text-indigo-400 font-extrabold">-AI</span></h1>
           <span id="role-badge" class="px-2 py-0.5 text-[10px] font-bold rounded-full bg-surface-800 text-slate-400 border border-surface-700">...</span>
         </div>
-        <p class="text-[11px] text-slate-500 -mt-0.5">Capture Proxy &bull; Telemetry &bull; Fine-Tuning Pipeline</p>
+        <p class="text-[11px] text-slate-500 -mt-0.5">Multi-Model Coordination &bull; Developer Telemetry &bull; Dataset Curation</p>
       </div>
     </div>
     <div class="flex items-center gap-2">
@@ -372,7 +372,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 
 </main>
 
-<footer class="border-t border-surface-700 px-6 py-3 text-center text-[10px] text-slate-600">AI Model Observer &bull; Role-Based Analytics Dashboard &bull; Auto-refresh 8s</footer>
+<footer class="border-t border-surface-700 px-6 py-3 text-center text-[10px] text-slate-600">VOLT-AI &bull; Multi-Model Coordination & Observability &bull; Auto-refresh 8s</footer>
 
 <!-- ========== ACCESS MODAL ========== -->
 <div id="access-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
@@ -392,7 +392,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     </div>
     <div id="modal-tab-admin" class="space-y-3 hidden">
       <p class="text-[11px] text-slate-400">Log in with the exact administrator key. Grants <strong>full global team visibility</strong> across all connected developers, total token consumption, system-wide task traces, and dataset curation exports.</p>
-      <input id="modal-input-admin-key" type="password" placeholder="Enter OBSERVER_ADMIN_KEY" class="w-full px-3 py-2 text-xs bg-surface-950 border border-surface-700 rounded-lg text-white focus:outline-none focus:border-indigo-500">
+      <input id="modal-input-admin-key" type="password" placeholder="Enter VOLT_ADMIN_KEY or OBSERVER_ADMIN_KEY" class="w-full px-3 py-2 text-xs bg-surface-950 border border-surface-700 rounded-lg text-white focus:outline-none focus:border-indigo-500">
       <div id="modal-admin-error" class="hidden text-rose-400 text-xs font-semibold px-2.5 py-1.5 bg-rose-950/60 border border-rose-800/60 rounded-lg"></div>
       <button onclick="submitAdminLogin()" id="btn-admin-submit" class="w-full py-2.5 bg-violet-600 hover:bg-violet-500 font-bold text-[11px] text-white rounded-lg transition shadow-md flex items-center justify-center gap-2">
         <span id="admin-login-spinner" class="hidden h-3 w-3 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
@@ -873,10 +873,10 @@ function renderCharts(series, days) {
 function renderIDECards() {
   const server = location.origin;
   const cards = [
-    { icon: '🤖', name: 'Cursor / VS Code (Continue)', desc: 'Route directly to ObserverCoder-1.0 multi-model assistant.', code: `Base URL: ${server}/v1\\nModel: observer-coder-1.0\\nAPI Key: <your-personal-key>` },
-    { icon: '🐚', name: 'PowerShell', desc: 'Paste into your terminal to route all OpenAI SDK calls through Observer.', code: `$env:OPENAI_BASE_URL="${server}/v1"\\n$env:OPENAI_API_KEY="<your-key>"\\n$env:X_SESSION_ID="${S.user}"` },
+    { icon: '⚡', name: 'Cursor / VS Code (Continue)', desc: 'Route directly to VOLT-AI multi-model assistant.', code: `Base URL: ${server}/v1\\nModel: VOLT-AI\\nAPI Key: <your-personal-key>` },
+    { icon: '🐚', name: 'PowerShell', desc: 'Paste into your terminal to route all OpenAI SDK calls through VOLT-AI.', code: `$env:OPENAI_BASE_URL="${server}/v1"\\n$env:OPENAI_API_KEY="<your-key>"\\n$env:X_SESSION_ID="${S.user}"` },
     { icon: '🐧', name: 'Bash / Zsh', desc: 'Export environment variables in your shell session.', code: `export OPENAI_BASE_URL="${server}/v1"\\nexport OPENAI_API_KEY="<your-key>"\\nexport X_SESSION_ID="${S.user}"` },
-    { icon: '📦', name: 'pip Install (Global CLI)', desc: 'Install the observer CLI package and run activate.', code: `pip install git+https://github.com/baizo7/observer.git\\nobserver activate` },
+    { icon: '⚡', name: 'VOLT CLI Companion', desc: 'Install or run the volt CLI companion in any terminal.', code: `volt activate\\nvolt code "Write a quicksort in python"` },
   ];
   const container = document.getElementById('ide-cards');
   container.innerHTML = '';

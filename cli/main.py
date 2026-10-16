@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-AI Observer CLI - Developer terminal companion.
-Activates local/team terminals to route through AI Observer and displays personal API usage.
+VOLT-AI CLI - Multi-Model AI Coordination, Routing, and Observability Terminal Companion.
+Activates local/team terminals to route through VOLT-AI and displays personal API usage.
 """
 import argparse
 import base64
@@ -19,18 +19,21 @@ import webbrowser
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
-CONFIG_DIR = Path.home() / ".ai-observer"
+CONFIG_DIR = Path.home() / ".volt-ai"
+LEGACY_CONFIG_DIR = Path.home() / ".ai-observer"
 CONFIG_FILE = CONFIG_DIR / "config.json"
+LEGACY_CONFIG_FILE = LEGACY_CONFIG_DIR / "config.json"
 
 
 def load_config() -> Dict[str, Any]:
-    """Load local client configuration."""
-    if CONFIG_FILE.exists():
-        try:
-            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception:
-            return {}
+    """Load local client configuration (checking ~/.volt-ai then ~/.ai-observer)."""
+    for cfg_path in (CONFIG_FILE, LEGACY_CONFIG_FILE):
+        if cfg_path.exists():
+            try:
+                with open(cfg_path, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            except Exception:
+                pass
     return {}
 
 
@@ -39,9 +42,15 @@ def save_config(cfg: Dict[str, Any]) -> None:
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
     with open(CONFIG_FILE, "w", encoding="utf-8") as f:
         json.dump(cfg, f, indent=2)
+    try:
+        LEGACY_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+        with open(LEGACY_CONFIG_FILE, "w", encoding="utf-8") as f:
+            json.dump(cfg, f, indent=2)
+    except Exception:
+        pass
 
 
-DEFAULT_SERVER = os.environ.get("OBSERVER_SERVER_URL", "https://ai-observer-8wcb.onrender.com")
+DEFAULT_SERVER = os.environ.get("VOLT_SERVER_URL") or os.environ.get("OBSERVER_SERVER_URL", "https://ai-observer-8wcb.onrender.com")
 
 
 def normalize_url(url: str) -> str:
@@ -55,16 +64,17 @@ def normalize_url(url: str) -> str:
 
 
 def get_server_url(cfg: Dict[str, Any]) -> str:
-    """Resolve active observer server base URL."""
+    """Resolve active VOLT-AI server base URL."""
     return normalize_url(
-        os.environ.get("OBSERVER_SERVER_URL")
+        os.environ.get("VOLT_SERVER_URL")
+        or os.environ.get("OBSERVER_SERVER_URL")
         or cfg.get("server_url")
         or DEFAULT_SERVER
     )
 
 
 def cmd_activate(args: argparse.Namespace) -> int:
-    """Activate or reconfigure AI Observer on the developer's computer."""
+    """Activate or reconfigure VOLT-AI on the developer's computer."""
     cfg = load_config()
     raw_server = args.server or cfg.get("server_url")
     server = normalize_url(raw_server if raw_server and "://" in raw_server else DEFAULT_SERVER)
@@ -73,8 +83,8 @@ def cmd_activate(args: argparse.Namespace) -> int:
     key = args.key or cfg.get("api_key")
 
     if not args.non_interactive:
-        print("=== AI Observer Client Setup ===")
-        input_server = input(f"Central Observer Server URL [{server}]: ").strip()
+        print("=== ⚡ VOLT-AI Client Setup ===")
+        input_server = input(f"Central VOLT-AI Server URL [{server}]: ").strip()
         if input_server:
             server = normalize_url(input_server)
         input_user = input(f"Developer Name / Session ID [{user}]: ").strip()
@@ -89,9 +99,9 @@ def cmd_activate(args: argparse.Namespace) -> int:
                 key = input_key
 
     # Check connection to server
-    print(f"\n[+] Verifying connection to AI Observer at {server}...")
+    print(f"\n[+] Verifying connection to VOLT-AI at {server}...")
     try:
-        req = urllib.request.Request(f"{server}/health", headers={"User-Agent": "AI-Observer-CLI/1.0"})
+        req = urllib.request.Request(f"{server}/health", headers={"User-Agent": "VOLT-AI-CLI/1.0"})
         with urllib.request.urlopen(req, timeout=5) as resp:
             data = json.loads(resp.read().decode("utf-8"))
             if data.get("ok"):
@@ -115,7 +125,7 @@ def cmd_activate(args: argparse.Namespace) -> int:
     is_claude = bool(key and key.startswith("sk-ant"))
 
     print("\n" + "=" * 60)
-    print("AI Observer is activated for your terminal!")
+    print("⚡ VOLT-AI is activated for your terminal!")
     print("=" * 60)
     print(f"Developer ID : {user}")
     print(f"Project      : {project}")
@@ -125,21 +135,23 @@ def cmd_activate(args: argparse.Namespace) -> int:
     elif key:
         print(f"Detected Key : Custom / Provider ({key[:8]}...)")
     else:
-        print("Detected Key : None (ObserverCoder cloud fallback active)")
+        print("Detected Key : None (VOLT-AI cloud fallback active)")
     print("=" * 60)
 
-    print("\nTo route your current terminal session through the Observer, run:")
+    print("\nTo route your current terminal session through VOLT-AI, run:")
     if sys.platform == "win32":
         if is_claude:
             print("  PowerShell (Anthropic / Claude):")
             print(f'    $env:ANTHROPIC_BASE_URL="{server}"')
             print(f'    $env:ANTHROPIC_API_KEY="{key}"')
+            print(f'    $env:VOLT_TASK_ID="{project}"')
             print(f'    $env:OBSERVER_TASK_ID="{project}"')
         else:
             print("  PowerShell (OpenAI / Gemini / OpenRouter):")
             print(f'    $env:OPENAI_BASE_URL="{proxy_v1}"')
             if key:
                 print(f'    $env:OPENAI_API_KEY="{key}"')
+            print(f'    $env:VOLT_TASK_ID="{project}"')
             print(f'    $env:OBSERVER_TASK_ID="{project}"')
             print("  PowerShell (Anthropic / Claude Messages API):")
             print(f'    $env:ANTHROPIC_BASE_URL="{server}"')
@@ -195,13 +207,16 @@ def cmd_usage(args: argparse.Namespace) -> int:
 
     admin_token = (
         getattr(args, "token", None)
+        or os.environ.get("VOLT_ADMIN_KEY")
+        or os.environ.get("VOLT_ADMIN_TOKEN")
         or os.environ.get("OBSERVER_ADMIN_KEY")
         or os.environ.get("OBSERVER_ADMIN_TOKEN")
         or cfg.get("admin_key")
     )
 
-    headers = {"User-Agent": "AI-Observer-CLI/1.0"}
+    headers = {"User-Agent": "VOLT-AI-CLI/1.0"}
     if admin_token:
+        headers["X-Volt-Token"] = str(admin_token).strip()
         headers["X-Admin-Token"] = str(admin_token).strip()
         headers["Authorization"] = f"Bearer {str(admin_token).strip()}"
     if user:
@@ -225,9 +240,9 @@ def cmd_usage(args: argparse.Namespace) -> int:
             print(f"    Server message: {server_detail}", file=sys.stderr)
             print("\nViewing organization-wide usage across all developers requires Administrator privileges.", file=sys.stderr)
             print("Please provide your admin key using the --token option:", file=sys.stderr)
-            print("    observer usage --all --token <YOUR_ADMIN_KEY>", file=sys.stderr)
-            print("Or set the OBSERVER_ADMIN_KEY environment variable in PowerShell:", file=sys.stderr)
-            print('    $env:OBSERVER_ADMIN_KEY = "your_admin_key"', file=sys.stderr)
+            print("    volt usage --all --token <YOUR_ADMIN_KEY>", file=sys.stderr)
+            print("Or set the VOLT_ADMIN_KEY environment variable in PowerShell:", file=sys.stderr)
+            print('    $env:VOLT_ADMIN_KEY = "your_admin_key"', file=sys.stderr)
             return 1
         elif exc.code == 401:
             print(f"\n[!] Authentication Required (HTTP 401): {server_detail}", file=sys.stderr)
@@ -247,7 +262,7 @@ def cmd_usage(args: argparse.Namespace) -> int:
         scope_label += f" | Project: {project}"
 
     print("\n" + "=" * 70)
-    print(f" AI Observer - Usage Analytics ({scope_label})")
+    print(f" ⚡ VOLT-AI - Usage Analytics ({scope_label})")
     print(f" Server: {server}")
     print("=" * 70)
 
@@ -287,7 +302,7 @@ def cmd_usage(args: argparse.Namespace) -> int:
     print("-" * 70)
     print(f"{'TOTAL':<30} {total_calls:<8} {'-':<14} {total_in:<12} {total_out:<12} {total_passes:<8}")
     print("=" * 70)
-    print(f"To open the interactive visual dashboard, run: observer dashboard\n")
+    print(f"To open the interactive visual dashboard, run: volt dashboard\n")
     return 0
 
 
@@ -297,7 +312,13 @@ def cmd_dashboard(args: argparse.Namespace) -> int:
     server = (args.server or get_server_url(cfg)).rstrip("/")
     url = f"{server}/dashboard"
     if getattr(args, "admin", False):
-        admin_token = getattr(args, "token", None) or os.environ.get("OBSERVER_ADMIN_KEY") or os.environ.get("ADMIN_TOKEN")
+        admin_token = (
+            getattr(args, "token", None)
+            or os.environ.get("VOLT_ADMIN_KEY")
+            or os.environ.get("VOLT_ADMIN_TOKEN")
+            or os.environ.get("OBSERVER_ADMIN_KEY")
+            or os.environ.get("ADMIN_TOKEN")
+        )
         if admin_token:
             url += f"?admin_token={urllib.parse.quote(admin_token)}"
         else:
@@ -306,7 +327,7 @@ def cmd_dashboard(args: argparse.Namespace) -> int:
         user = getattr(args, "user", None) or cfg.get("user")
         if user:
             url += f"?user={urllib.parse.quote(user)}"
-    print(f"[+] Opening AI Observer Dashboard: {url}")
+    print(f"[+] Opening VOLT-AI Dashboard: {url}")
     try:
         webbrowser.open(url)
     except Exception as exc:
@@ -377,9 +398,9 @@ def cmd_env(args: argparse.Namespace) -> int:
     return 0
 
 
-# ────────── ObserverCoder-1.0 Multi-Model Engine ──────────
+# ────────── VOLT-AI Multi-Model Engine ──────────
 
-OBSERVER_CODER_CATALOG = [
+VOLT_AI_CATALOG = [
     {
         "specialist": "fast_coder",
         "primary": "local/qwen2.5-coder:1.5b",
@@ -421,6 +442,8 @@ OBSERVER_CODER_CATALOG = [
         "track": "vision (Multimodal Image Input)"
     }
 ]
+# Backward-compatibility alias
+OBSERVER_CODER_CATALOG = VOLT_AI_CATALOG
 
 
 class ThinkingIndicator:
@@ -500,14 +523,14 @@ def query_observer_coder(
     show_indicator: bool = True,
 ) -> Tuple[str, Dict[str, Any]]:
     """
-    Sends request to /v1/chat/completions for observer-coder-1.0.
+    Sends request to /v1/chat/completions for VOLT-AI.
     Returns (response_text, metadata_dict).
     If stream=True, streams tokens directly to stdout.
     Shows animated ThinkingIndicator until the first token arrives.
     """
     url = f"{server.rstrip('/')}/v1/chat/completions"
     payload = {
-        "model": "observer-coder-1.0",
+        "model": "VOLT-AI",
         "messages": messages,
         "temperature": temperature,
         "stream": stream,
@@ -515,7 +538,7 @@ def query_observer_coder(
     data = json.dumps(payload).encode("utf-8")
     headers = {
         "Content-Type": "application/json",
-        "User-Agent": "ObserverCoder-CLI/1.0",
+        "User-Agent": "VOLT-AI-CLI/1.0",
         "X-Session-Id": user or "cli-user",
         "X-Project": project or "cli-project",
     }
@@ -534,9 +557,9 @@ def query_observer_coder(
             indicator.start()
         try:
             with urllib.request.urlopen(req, timeout=timeout) as resp:
-                meta["track"] = resp.headers.get("x-observer-track")
-                meta["specialists"] = resp.headers.get("x-observer-specialists")
-                meta["latency_ms"] = resp.headers.get("x-observer-latency-ms")
+                meta["track"] = resp.headers.get("x-volt-track") or resp.headers.get("x-observer-track")
+                meta["specialists"] = resp.headers.get("x-volt-specialists") or resp.headers.get("x-observer-specialists")
+                meta["latency_ms"] = resp.headers.get("x-volt-latency-ms") or resp.headers.get("x-observer-latency-ms")
 
                 for raw_line in resp:
                     line = raw_line.decode("utf-8", errors="replace").strip()
@@ -581,13 +604,15 @@ def query_observer_coder(
                 if indicator:
                     indicator.stop()
                     indicator = None
-                meta["track"] = resp.headers.get("x-observer-track")
-                meta["specialists"] = resp.headers.get("x-observer-specialists")
-                meta["latency_ms"] = resp.headers.get("x-observer-latency-ms")
+                meta["track"] = resp.headers.get("x-volt-track") or resp.headers.get("x-observer-track")
+                meta["specialists"] = resp.headers.get("x-volt-specialists") or resp.headers.get("x-observer-specialists")
+                meta["latency_ms"] = resp.headers.get("x-volt-latency-ms") or resp.headers.get("x-observer-latency-ms")
                 body = json.loads(resp.read().decode("utf-8"))
                 choice = body.get("choices", [{}])[0]
                 text = choice.get("message", {}).get("content", "")
-                if "observer_coordination" in body:
+                if "volt_coordination" in body:
+                    meta.update(body["volt_coordination"])
+                elif "observer_coordination" in body:
                     meta.update(body["observer_coordination"])
                 if "usage" in body:
                     meta["usage"] = body["usage"]
@@ -601,6 +626,10 @@ def query_observer_coder(
         finally:
             if indicator:
                 indicator.stop()
+
+
+# Alias for query_observer_coder
+query_volt_ai = query_observer_coder
 
 
 LANGUAGE_DEFAULT_FILES = {
@@ -704,13 +733,12 @@ def write_code_blocks(blocks: list[Dict[str, Any]], target_file: Optional[str] =
 
 
 def cmd_models(args: argparse.Namespace) -> int:
-
-    """List the specialist models, fallback tiers, licenses, and tracks in ObserverCoder-1.0."""
+    """List the specialist models, fallback tiers, licenses, and tracks in VOLT-AI."""
     cfg = load_config()
     server = (getattr(args, "server", None) or get_server_url(cfg)).rstrip("/")
 
     print("\n" + "=" * 80)
-    print(" ObserverCoder-1.0 - Multi-Model Coordination Engine Roster")
+    print(" ⚡ VOLT-AI - Multi-Model Coordination Engine Roster")
     print(f" Connected Server: {server}")
     print("=" * 80)
 
@@ -718,7 +746,7 @@ def cmd_models(args: argparse.Namespace) -> int:
     print(header)
     print("-" * 80)
 
-    for spec in OBSERVER_CODER_CATALOG:
+    for spec in VOLT_AI_CATALOG:
         print(f"{spec['specialist']:<18} {spec['primary']:<25} {spec['fallback']:<25} {spec['license']:<10}")
         print(f"  └─ Role: {spec['role']}")
         print(f"  └─ Activated by: {spec['track']}\n")
@@ -733,7 +761,7 @@ def cmd_models(args: argparse.Namespace) -> int:
 
 
 def cmd_code(args: argparse.Namespace) -> int:
-    """Generate code or get technical answers via ObserverCoder-1.0."""
+    """Generate code or get technical answers via VOLT-AI."""
     cfg = load_config()
     server = (getattr(args, "server", None) or get_server_url(cfg)).rstrip("/")
     key = (
@@ -764,7 +792,7 @@ def cmd_code(args: argparse.Namespace) -> int:
             print(f"[!] Warning: File '{file_path}' not found.", file=sys.stderr)
 
     if not prompt:
-        print('Error: No prompt provided. Usage: observer code "Your instruction here" [-f file.py]', file=sys.stderr)
+        print('Error: No prompt provided. Usage: volt code "Your instruction here" [-f file.py]', file=sys.stderr)
         return 1
 
     # Check image attachment if specified
@@ -788,7 +816,7 @@ def cmd_code(args: argparse.Namespace) -> int:
     stream = not getattr(args, "no_stream", False)
     temperature = getattr(args, "temperature", 0.2)
 
-    print(f"[ObserverCoder-1.0] Connecting to {server}...")
+    print(f"[⚡ VOLT-AI] Connecting to {server}...")
 
     t0 = time.perf_counter()
     try:
@@ -813,7 +841,7 @@ def cmd_code(args: argparse.Namespace) -> int:
         )
 
         # Print badge summary
-        print(f"\n[{'='*15} ObserverCoder-1.0 Trace {'='*15}]")
+        print(f"\n[{'='*15} ⚡ VOLT-AI Trace {'='*15}]")
         print(f"Track       : {track}")
         print(f"Specialists : {specialists}")
         print(f"Duration    : {elapsed_ms} ms")
@@ -850,12 +878,12 @@ def cmd_code(args: argparse.Namespace) -> int:
 
         return 0
     except Exception as exc:
-        print(f"\n[!] ObserverCoder Error: {exc}", file=sys.stderr)
+        print(f"\n[!] VOLT-AI Error: {exc}", file=sys.stderr)
         return 1
 
 
 def cmd_chat(args: argparse.Namespace) -> int:
-    """Start an interactive multi-turn terminal chat with ObserverCoder-1.0."""
+    """Start an interactive multi-turn terminal chat with VOLT-AI."""
     cfg = load_config()
     server = (getattr(args, "server", None) or get_server_url(cfg)).rstrip("/")
     key = (
@@ -868,7 +896,7 @@ def cmd_chat(args: argparse.Namespace) -> int:
     project = getattr(args, "project", None) or cfg.get("project") or "cli-chat"
 
     print("\n" + "=" * 65)
-    print(" ObserverCoder-1.0 - Interactive Multi-Model Terminal")
+    print(" ⚡ VOLT-AI - Interactive Multi-Model Terminal")
     print(f" Server: {server}")
     print(" Type your code instructions or questions below.")
     print(" Commands: /write [name], /apply, /ls, /models, /clear, exit")
@@ -878,9 +906,9 @@ def cmd_chat(args: argparse.Namespace) -> int:
 
     while True:
         try:
-            prompt = input("observer-coder> ").strip()
+            prompt = input("volt-ai> ").strip()
         except (KeyboardInterrupt, EOFError):
-            print("\nExiting ObserverCoder.")
+            print("\nExiting VOLT-AI.")
             break
 
         if not prompt:
@@ -997,23 +1025,23 @@ def cmd_chat(args: argparse.Namespace) -> int:
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        prog="observer",
-        description="AI Model Observer CLI - Activate terminal proxying and coordinate ObserverCoder-1.0 models.",
+        prog="volt",
+        description="⚡ VOLT-AI CLI - Multi-Model AI Coordination, Routing, and Observability Engine.",
     )
     parser.add_argument("--admin", action="store_true", help="Open visual dashboard in Admin mode")
     parser.add_argument("--token", help="Admin secret token")
     subparsers = parser.add_subparsers(dest="subcommand", help="Available subcommands")
 
     # activate
-    p_act = subparsers.add_parser("activate", help="Configure and activate Observer in this terminal")
-    p_act.add_argument("--server", help="Observer server URL (default: https://ai-observer-8wcb.onrender.com)")
+    p_act = subparsers.add_parser("activate", help="Configure and activate VOLT-AI in this terminal")
+    p_act.add_argument("--server", help="VOLT-AI server URL (default: https://ai-observer-8wcb.onrender.com)")
     p_act.add_argument("--user", help="Your developer username / session ID")
     p_act.add_argument("--project", help="Default project tag")
     p_act.add_argument("--key", help="Your personal API key")
     p_act.add_argument("-y", "--non-interactive", action="store_true", help="Skip interactive prompts")
 
-    # code / ask / run (ObserverCoder-1.0 single-turn synthesis)
-    p_code = subparsers.add_parser("code", aliases=["ask", "run"], help="Generate code or solve tasks with ObserverCoder-1.0")
+    # code / ask / run (VOLT-AI single-turn synthesis)
+    p_code = subparsers.add_parser("code", aliases=["ask", "run"], help="Generate code or solve tasks with VOLT-AI")
     p_code.add_argument("prompt", nargs="?", default="", help="Instruction or coding task (or pipe via stdin)")
     p_code.add_argument("-f", "--file", help="File context to attach to prompt")
     p_code.add_argument("-i", "--image", help="Image or UI mockup file for visual inspection (Qwen2-VL)")
@@ -1021,27 +1049,26 @@ def main() -> int:
     p_code.add_argument("-w", "--write", "-a", "--apply", action="store_true", help="Auto-write detected code blocks directly to files in the current directory")
     p_code.add_argument("--no-stream", action="store_true", help="Disable live streaming output")
     p_code.add_argument("--temperature", type=float, default=0.2, help="Sampling temperature (default: 0.2)")
-    p_code.add_argument("--server", help="Observer server URL")
+    p_code.add_argument("--server", help="VOLT-AI server URL")
     p_code.add_argument("--key", help="API key")
     p_code.add_argument("--user", help="Developer username")
     p_code.add_argument("--project", help="Project name")
 
-    # chat (ObserverCoder-1.0 multi-turn interactive session)
-    p_chat = subparsers.add_parser("chat", help="Start an interactive multi-turn coding session with ObserverCoder-1.0")
+    # chat (VOLT-AI multi-turn interactive session)
+    p_chat = subparsers.add_parser("chat", help="Start an interactive multi-turn coding session with VOLT-AI")
     p_chat.add_argument("-w", "--write", "-a", "--apply", action="store_true", help="Automatically write all generated code blocks without prompting")
-    p_chat.add_argument("--server", help="Observer server URL")
+    p_chat.add_argument("--server", help="VOLT-AI server URL")
     p_chat.add_argument("--key", help="API key")
     p_chat.add_argument("--user", help="Developer username")
     p_chat.add_argument("--project", help="Project name")
 
-
     # models / specialists
-    p_models = subparsers.add_parser("models", aliases=["specialists"], help="List specialist models and routing tracks in ObserverCoder-1.0")
-    p_models.add_argument("--server", help="Observer server URL")
+    p_models = subparsers.add_parser("models", aliases=["specialists"], help="List specialist models and routing tracks in VOLT-AI")
+    p_models.add_argument("--server", help="VOLT-AI server URL")
 
     # usage / stats
     p_usage = subparsers.add_parser("usage", aliases=["stats"], help="View your API token usage and stats")
-    p_usage.add_argument("--server", help="Observer server URL")
+    p_usage.add_argument("--server", help="VOLT-AI server URL")
     p_usage.add_argument("--user", help="Filter by specific developer username")
     p_usage.add_argument("--project", help="Filter by project")
     p_usage.add_argument("--all", action="store_true", help="Show all team usage instead of just yours")
@@ -1049,15 +1076,15 @@ def main() -> int:
 
     # dashboard
     p_dash = subparsers.add_parser("dashboard", help="Open visual web dashboard in browser")
-    p_dash.add_argument("--server", help="Observer server URL")
+    p_dash.add_argument("--server", help="VOLT-AI server URL")
     p_dash.add_argument("--user", help="Developer username to view scoped personal dashboard")
     p_dash.add_argument("--admin", action="store_true", help="Open in Admin mode with full system visibility")
     p_dash.add_argument("--token", help="Admin secret token")
 
     # test
     p_test = subparsers.add_parser("test", help="Test connection and model response through proxy")
-    p_test.add_argument("--server", help="Observer server URL")
-    p_test.add_argument("--model", default="observer-coder-1.0", help="Model name to test (default: observer-coder-1.0)")
+    p_test.add_argument("--server", help="VOLT-AI server URL")
+    p_test.add_argument("--model", default="VOLT-AI", help="Model name to test (default: VOLT-AI)")
     p_test.add_argument("--key", help="Your personal API key")
     p_test.add_argument("--user", help="Developer username")
     p_test.add_argument("--project", help="Project name")
@@ -1065,7 +1092,7 @@ def main() -> int:
     # env
     p_env = subparsers.add_parser("env", help="Print shell export statements for OPENAI_BASE_URL")
     p_env.add_argument("--shell", choices=["bash", "zsh", "powershell"], default="powershell" if sys.platform == "win32" else "bash")
-    p_env.add_argument("--server", help="Observer server URL")
+    p_env.add_argument("--server", help="VOLT-AI server URL")
 
     args = parser.parse_args()
 
@@ -1096,7 +1123,7 @@ def main() -> int:
 
 
 def main_coder() -> int:
-    """Dedicated entry point for 'observer-coder' command line executable."""
+    """Dedicated entry point for 'volt-coder' and 'observer-coder' command line executables."""
     recognized = {
         "code", "ask", "run", "chat", "models", "specialists",
         "activate", "usage", "dashboard", "test", "env", "--help", "-h"

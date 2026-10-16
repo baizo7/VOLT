@@ -37,7 +37,7 @@ def test_cmd_models_output(capsys):
     ret = cmd_models(mock_args)
     assert ret == 0
     captured = capsys.readouterr().out
-    assert "ObserverCoder-1.0 - Multi-Model Coordination Engine Roster" in captured
+    assert "VOLT-AI - Multi-Model Coordination Engine Roster" in captured
     assert "fast_coder" in captured
     assert "deep_reasoner" in captured
     assert "two_pass_reasoning" in captured
@@ -147,7 +147,7 @@ def test_cmd_chat_exit(capsys):
         ret = cmd_chat(mock_args)
     assert ret == 0
     captured = capsys.readouterr().out
-    assert "ObserverCoder-1.0 - Interactive Multi-Model Terminal" in captured
+    assert "VOLT-AI - Interactive Multi-Model Terminal" in captured
     assert "Goodbye!" in captured
 
 

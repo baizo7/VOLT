@@ -3,9 +3,9 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "ai-observer"
+name = "volt-ai"
 version = "1.0.0"
-description = "Transparent LLM capture proxy, telemetry observer, and developer CLI"
+description = "VOLT-AI: Intelligent Multi-Model AI Coordination, Routing, and Observability Engine"
 readme = "README.md"
 requires-python = ">=3.9"
 
@@ -20,5 +20,8 @@ server = [
 ]
 
 [project.scripts]
+volt = "cli.main:main"
+volt-ai = "cli.main:main"
+volt-coder = "cli.main:main_coder"
 observer = "cli.main:main"
 observer-coder = "cli.main:main_coder"

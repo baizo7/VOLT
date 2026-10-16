@@ -321,3 +321,44 @@ async def test_call_specialist_malformed_json_triggers_fallback():
     assert text == "recovered from bad json"
     assert mock_client.post.call_count == 2
 
+
+@pytest.mark.asyncio
+async def test_volt_ai_endpoint_non_streaming(async_client, monkeypatch):
+    mock_client = AsyncMock()
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.json.return_value = {
+        "choices": [{"message": {"content": "print('hello from VOLT-AI')"}}],
+        "usage": {"prompt_tokens": 18, "completion_tokens": 9}
+    }
+    mock_client.post.return_value = mock_resp
+    monkeypatch.setattr(main, "client", mock_client)
+
+    payload = {
+        "model": "VOLT-AI",
+        "messages": [{"role": "user", "content": "Write quicksort in python"}],
+        "stream": False
+    }
+
+    resp = await async_client.post("/v1/chat/completions", json=payload)
+    assert resp.status_code == 200
+    data = resp.json()
+
+    assert data["model"] == "VOLT-AI"
+    assert "hello from VOLT-AI" in data["choices"][0]["message"]["content"]
+    assert "volt_coordination" in data
+    assert data["volt_coordination"]["track"] == "fast_coding"
+    assert resp.headers.get("x-volt-model") == "VOLT-AI"
+    assert resp.headers.get("x-observer-model") == "VOLT-AI"
+
+
+@pytest.mark.asyncio
+async def test_volt_ai_models_listing(async_client):
+    resp = await async_client.get("/v1/models")
+    assert resp.status_code == 200
+    data = resp.json()
+    model_ids = [m["id"] for m in data["data"]]
+    assert "VOLT-AI" in model_ids
+    assert "volt-ai-1.0" in model_ids
+    assert "observer-coder-1.0" in model_ids
+

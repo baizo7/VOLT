@@ -313,9 +313,12 @@ async def proxy(request: Request, style: str, project: str = None):
     effective_project = project or request.headers.get("x-project")
     requested_model = body.get("model", "unknown")
 
-    # ObserverCoder-1.0 Unified Multi-Model Coordination
+    # VOLT-AI / ObserverCoder Unified Multi-Model Coordination
     if isinstance(requested_model, str) and (
-        requested_model.lower().startswith("observer-coder")
+        requested_model.upper().startswith("VOLT-AI")
+        or requested_model.lower().startswith("volt-ai")
+        or requested_model.lower().startswith("volt")
+        or requested_model.lower().startswith("observer-coder")
         or requested_model.lower().startswith("observercoder")
     ):
         return await coordinate_request(
@@ -1019,12 +1022,28 @@ async def list_models(request: Request):
         return JSONResponse({"error": "unauthorized"}, status_code=401)
     model_list = [
         {
+            "id": "VOLT-AI",
+            "object": "model",
+            "created": 1700000000,
+            "owned_by": "volt-ai",
+            "permission": [],
+            "root": "VOLT-AI",
+        },
+        {
+            "id": "volt-ai-1.0",
+            "object": "model",
+            "created": 1700000000,
+            "owned_by": "volt-ai",
+            "permission": [],
+            "root": "VOLT-AI",
+        },
+        {
             "id": "observer-coder-1.0",
             "object": "model",
             "created": 1700000000,
-            "owned_by": "observer-coder",
+            "owned_by": "volt-ai",
             "permission": [],
-            "root": "observer-coder-1.0",
+            "root": "VOLT-AI",
         }
     ]
     for prefix, cfg in routes.items():
@@ -1196,7 +1215,12 @@ async def admin_verify_endpoint(request: Request):
         try:
             body = await request.json()
             key_candidate = body.get("admin_key") or body.get("key") or body.get("token")
-            admin_key = os.environ.get("OBSERVER_ADMIN_KEY") or os.environ.get("OBSERVER_ADMIN_TOKEN")
+            admin_key = (
+                os.environ.get("VOLT_ADMIN_KEY")
+                or os.environ.get("VOLT_ADMIN_TOKEN")
+                or os.environ.get("OBSERVER_ADMIN_KEY")
+                or os.environ.get("OBSERVER_ADMIN_TOKEN")
+            )
             if key_candidate and admin_key and secrets.compare_digest(str(key_candidate).strip(), admin_key.strip()):
                 valid = True
         except Exception:
