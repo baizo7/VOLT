@@ -1,4 +1,4 @@
--- AI Model Observer: Phase 1 schema (PostgreSQL 14+)
+-- VOLT-AI Engine Schema (PostgreSQL 14+)
 
 CREATE TABLE IF NOT EXISTS tasks (
     task_id     TEXT PRIMARY KEY,

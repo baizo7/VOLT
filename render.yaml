@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: ai-observer
+    name: volt-ai
     runtime: python
     plan: free
     buildCommand: pip install -r requirements.txt && python setup.py bdist_wheel
@@ -12,3 +12,7 @@ services:
         value: routes.json
       - key: MAX_STORED_CHARS
         value: "200000"
+      - key: VOLT_ADMIN_KEY
+        sync: false
+      - key: OBSERVER_ADMIN_KEY
+        sync: false
