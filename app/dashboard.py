@@ -494,10 +494,19 @@ function authHeaders() {
 }
 async function fetchData() {
   try {
-    const hRes = await fetch('/health'); const hD = await hRes.json();
+    let hD = { ok: false, status: 'offline' };
+    try {
+      const hRes = await fetch('/health');
+      if (hRes.ok) hD = await hRes.json();
+    } catch(err) {}
     const hBadge = document.getElementById('health-badge');
-    if (hD.ok) { hBadge.className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-950/60 text-emerald-400 border border-emerald-800/50"; hBadge.innerHTML='<span class="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse"></span>Online'; }
-    else { hBadge.className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-rose-950/60 text-rose-400 border border-rose-800/50"; hBadge.innerHTML='<span class="h-1.5 w-1.5 rounded-full bg-rose-400"></span>Offline'; }
+    if (hD.ok && hD.status === 'ready') {
+      hBadge.className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-950/60 text-emerald-400 border border-emerald-800/50";
+      hBadge.innerHTML='<span class="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse"></span>Online';
+    } else {
+      hBadge.className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-amber-950/60 text-amber-400 border border-amber-800/50";
+      hBadge.innerHTML='<span class="h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse"></span>DB Connecting';
+    }
 
     let sq = '', tq = '', h = authHeaders();
     if (S.role === 'admin') {
@@ -509,8 +518,21 @@ async function fetchData() {
       tq = '?session_id='+encodeURIComponent(S.user);
       fetchUserProfile(S.user);
     }
-    const sRes = await fetch('/stats'+sq, {headers:h}); if (sRes.ok) { S.statsCache = await sRes.json(); renderStats(S.statsCache); }
-    const tRes = await fetch('/tasks'+tq, {headers:h}); if (tRes.ok) renderTasks(await tRes.json());
+    const sRes = await fetch('/stats'+sq, {headers:h});
+    if (sRes.ok) {
+      S.statsCache = await sRes.json();
+      renderStats(S.statsCache);
+    } else if (sRes.status === 503) {
+      const mb = document.getElementById('models-body');
+      if (mb) mb.innerHTML = '<tr><td colspan="8" class="py-6 text-center text-amber-400 text-xs">⚠️ Database is connecting. Run <code class="mono bg-surface-900 px-2 py-0.5 rounded border border-surface-700 text-cyan-300">docker compose up -d db</code> in terminal.</td></tr>';
+    }
+    const tRes = await fetch('/tasks'+tq, {headers:h});
+    if (tRes.ok) {
+      renderTasks(await tRes.json());
+    } else if (tRes.status === 503) {
+      const tb = document.getElementById('tasks-body');
+      if (tb) tb.innerHTML = '<tr><td colspan="7" class="py-6 text-center text-amber-400 text-xs">⚠️ Database is connecting. Run <code class="mono bg-surface-900 px-2 py-0.5 rounded border border-surface-700 text-cyan-300">docker compose up -d db</code> in terminal.</td></tr>';
+    }
     fetchTimeseries();
   } catch(e) { console.error('Refresh:', e); }
 }

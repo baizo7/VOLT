@@ -191,37 +191,63 @@ pool: Optional[asyncpg.Pool] = None
 client: Optional[httpx.AsyncClient] = None
 
 
+async def init_db_pool():
+    """Create asyncpg connection pool and apply schema.sql idempotently."""
+    global pool
+    clean_db_url = DATABASE_URL
+    ssl_ctx = None
+    if "sslmode=" in clean_db_url:
+        clean_db_url = clean_db_url.split("?sslmode=")[0].split("&sslmode=")[0]
+        ssl_ctx = "require"
+    elif clean_db_url and "localhost" not in clean_db_url and "127.0.0.1" not in clean_db_url:
+        ssl_ctx = "require"
+
+    new_pool = await asyncpg.create_pool(clean_db_url, min_size=1, max_size=10, ssl=ssl_ctx)
+    schema_path = os.path.join(os.path.dirname(__file__), "schema.sql")
+    if os.path.exists(schema_path):
+        try:
+            with open(schema_path, "r", encoding="utf-8") as f:
+                schema_content = f.read()
+            async with new_pool.acquire() as conn:
+                await conn.execute(schema_content)
+            logger.info("Database schema verified and applied.")
+        except Exception as schema_err:
+            logger.warning(f"Schema initialization notice: {schema_err}")
+    pool = new_pool
+    logger.info("Connected to PostgreSQL database successfully.")
+    return True
+
+
+async def _background_db_reconnect():
+    """Continuously retry database connection in background if initial startup failed."""
+    global pool
+    while pool is None:
+        await asyncio.sleep(3)
+        try:
+            logger.info("Attempting background database connection...")
+            await init_db_pool()
+            if pool is not None:
+                logger.info("Background database connection established!")
+                break
+        except Exception as exc:
+            logger.debug(f"Background database reconnect attempt failed: {exc}")
+
+
 @asynccontextmanager
 async def lifespan(app):
     global pool, client, routes
+    reconnect_task = None
     try:
-        clean_db_url = DATABASE_URL
-        ssl_ctx = None
-        if "sslmode=" in clean_db_url:
-            clean_db_url = clean_db_url.split("?sslmode=")[0].split("&sslmode=")[0]
-            ssl_ctx = "require"
-        elif clean_db_url and "localhost" not in clean_db_url and "127.0.0.1" not in clean_db_url:
-            ssl_ctx = "require"
-
-        pool = await asyncpg.create_pool(clean_db_url, min_size=1, max_size=10, ssl=ssl_ctx)
-
-        # Idempotently apply schema.sql so cloud databases (Supabase/Neon) are initialized automatically
-        schema_path = os.path.join(os.path.dirname(__file__), "schema.sql")
-        if os.path.exists(schema_path):
-            try:
-                with open(schema_path, "r", encoding="utf-8") as f:
-                    schema_content = f.read()
-                async with pool.acquire() as conn:
-                    await conn.execute(schema_content)
-                logger.info("Database schema verified and applied.")
-            except Exception as schema_err:
-                logger.warning(f"Schema initialization notice: {schema_err}")
+        await init_db_pool()
     except Exception as e:
-        logger.error(f"Failed to connect to database: {e}")
+        logger.error(f"Failed to connect to database at startup: {e}")
         pool = None
+        reconnect_task = asyncio.create_task(_background_db_reconnect())
     client = httpx.AsyncClient(timeout=httpx.Timeout(600.0, connect=15.0))
     routes = load_routes(ROUTES_FILE)
     yield
+    if reconnect_task and not reconnect_task.done():
+        reconnect_task.cancel()
     if client:
         await client.aclose()
     if pool:
