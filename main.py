@@ -50,6 +50,7 @@ from app.dataset import (
     export_sft_dataset,
     split_dataset,
 )
+from app.coordinator import coordinate_request
 from app.embeddings import get_embedding
 from app.knowledge import (
     index_solution,
@@ -209,7 +210,24 @@ async def proxy(request: Request, style: str, project: str = None):
     if not isinstance(body, dict):
         return JSONResponse({"error": "Request body must be a JSON object"}, status_code=400)
 
+    effective_project = project or request.headers.get("x-project")
     requested_model = body.get("model", "unknown")
+
+    # ObserverCoder-1.0 Unified Multi-Model Coordination
+    if isinstance(requested_model, str) and (
+        requested_model.lower().startswith("observer-coder")
+        or requested_model.lower().startswith("observercoder")
+    ):
+        return await coordinate_request(
+            request=request,
+            body=body,
+            client=client,
+            pool=pool,
+            project=effective_project,
+            log_call_fn=log_call,
+            routes_map=routes,
+        )
+
     if isinstance(requested_model, str) and requested_model.startswith("opencode/"):
         # Keep OpenCode catalogue models out of dynamic provider routing.
         model = requested_model
@@ -883,7 +901,16 @@ async def list_models(request: Request):
     """OpenAI-compatible models catalog endpoint."""
     if not check_auth(request):
         return JSONResponse({"error": "unauthorized"}, status_code=401)
-    model_list = []
+    model_list = [
+        {
+            "id": "observer-coder-1.0",
+            "object": "model",
+            "created": 1700000000,
+            "owned_by": "observer-coder",
+            "permission": [],
+            "root": "observer-coder-1.0",
+        }
+    ]
     for prefix, cfg in routes.items():
         if prefix == "*":
             continue
@@ -894,8 +921,6 @@ async def list_models(request: Request):
             "created": 1700000000,
             "owned_by": "ai-model-observer"
         })
-    if not model_list:
-        model_list.append({"id": "default", "object": "model", "owned_by": "ai-model-observer"})
     return {"object": "list", "data": model_list}
 
 

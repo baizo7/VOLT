@@ -727,7 +727,7 @@ function renderCharts(series, days) {
 function renderIDECards() {
   const server = location.origin;
   const cards = [
-    { icon: '🖥️', name: 'Cursor / VS Code (Continue)', desc: 'Override the OpenAI-compatible base URL in your IDE settings.', code: `Base URL: ${server}/v1\\nModel: gemini-3.1-flash-lite-preview\\nAPI Key: <your-personal-key>` },
+    { icon: '🤖', name: 'Cursor / VS Code (Continue)', desc: 'Route directly to ObserverCoder-1.0 multi-model assistant.', code: `Base URL: ${server}/v1\\nModel: observer-coder-1.0\\nAPI Key: <your-personal-key>` },
     { icon: '🐚', name: 'PowerShell', desc: 'Paste into your terminal to route all OpenAI SDK calls through Observer.', code: `$env:OPENAI_BASE_URL="${server}/v1"\\n$env:OPENAI_API_KEY="<your-key>"\\n$env:X_SESSION_ID="${S.user}"` },
     { icon: '🐧', name: 'Bash / Zsh', desc: 'Export environment variables in your shell session.', code: `export OPENAI_BASE_URL="${server}/v1"\\nexport OPENAI_API_KEY="<your-key>"\\nexport X_SESSION_ID="${S.user}"` },
     { icon: '📦', name: 'pip Install (Global CLI)', desc: 'Install the observer CLI package and run activate.', code: `pip install git+https://github.com/baizo7/observer.git\\nobserver activate` },
