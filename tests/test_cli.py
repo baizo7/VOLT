@@ -5,6 +5,7 @@ import io
 import json
 import os
 import sys
+import time
 from unittest.mock import MagicMock, patch
 import pytest
 
@@ -16,6 +17,7 @@ from cli.main import (
     main_coder,
     OBSERVER_CODER_CATALOG,
     query_observer_coder,
+    ThinkingIndicator,
 )
 
 
@@ -247,4 +249,58 @@ def test_cmd_chat_write_command(tmp_path):
                 assert "Coffee" in (tmp_path / "index.html").read_text(encoding="utf-8")
     finally:
         os.chdir(orig_cwd)
+
+
+def test_thinking_indicator_non_tty():
+    ind = ThinkingIndicator("Thinking...")
+    ind._is_tty = False
+    ind.start()
+    assert ind._thread is None
+    ind.stop()
+
+
+def test_thinking_indicator_lifecycle():
+    stream = io.StringIO()
+    ind = ThinkingIndicator("Testing...", interval=0.01)
+    ind._is_tty = True
+    with patch("sys.stdout", stream):
+        ind.start()
+        time.sleep(0.05)
+        ind.stop()
+    output = stream.getvalue()
+    assert "Testing..." in output
+    assert "\r" in output
+
+
+def test_thinking_indicator_context_manager():
+    ind = ThinkingIndicator("Testing...", interval=0.01)
+    ind._is_tty = False
+    with ind:
+        pass
+    assert ind._thread is None
+
+
+def test_query_observer_coder_streaming_with_indicator():
+    sse_lines = [
+        b'data: {"choices":[{"delta":{"content":"Hello world"}}]}\n\n',
+        b'data: [DONE]\n\n'
+    ]
+    mock_resp = MagicMock()
+    mock_resp.headers = {
+        "x-observer-track": "fast_coding",
+        "x-observer-specialists": "fast_coder",
+        "x-observer-latency-ms": "50",
+    }
+    mock_resp.__iter__.return_value = iter(sse_lines)
+    mock_resp.__enter__.return_value = mock_resp
+
+    with patch("urllib.request.urlopen", return_value=mock_resp):
+        text, meta = query_observer_coder(
+            messages=[{"role": "user", "content": "Hi"}],
+            server="http://testserver",
+            stream=True,
+            show_indicator=True,
+        )
+    assert text == "Hello world"
+    assert meta["track"] == "fast_coding"
 

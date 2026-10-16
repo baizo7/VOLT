@@ -10,6 +10,7 @@ import mimetypes
 import os
 import re
 import sys
+import threading
 import time
 import urllib.request
 import urllib.error
@@ -347,6 +348,71 @@ OBSERVER_CODER_CATALOG = [
 ]
 
 
+class ThinkingIndicator:
+    """
+    Threaded terminal spinner showing 'Thinking...' with elapsed time.
+    Erases itself cleanly the moment the first streaming token arrives.
+    """
+    def __init__(self, message: str = "Thinking...", interval: float = 0.08):
+        self.message = message
+        self.interval = interval
+        self._stop_event = threading.Event()
+        self._thread: Optional[threading.Thread] = None
+        self._is_tty = hasattr(sys.stdout, "isatty") and sys.stdout.isatty()
+        self._last_len = 0
+        self.frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+        try:
+            "⠋".encode(getattr(sys.stdout, "encoding", None) or "utf-8")
+        except Exception:
+            self.frames = ["-", "\\", "|", "/"]
+
+    def _spin(self) -> None:
+        t0 = time.time()
+        idx = 0
+        while not self._stop_event.is_set():
+            elapsed = time.time() - t0
+            frame = self.frames[idx % len(self.frames)]
+            idx += 1
+            text = f"\r{frame} {self.message} ({elapsed:.1f}s)"
+            self._last_len = max(self._last_len, len(text))
+            try:
+                sys.stdout.write(text)
+                sys.stdout.flush()
+            except Exception:
+                break
+            if self._stop_event.wait(self.interval):
+                break
+
+    def start(self) -> "ThinkingIndicator":
+        if not self._is_tty:
+            return self
+        self._stop_event.clear()
+        self._last_len = 0
+        self._thread = threading.Thread(target=self._spin, daemon=True)
+        self._thread.start()
+        return self
+
+    def stop(self) -> None:
+        if not self._is_tty:
+            return
+        self._stop_event.set()
+        if self._thread and self._thread.is_alive():
+            self._thread.join(timeout=0.5)
+        clear_len = max(self._last_len + 5, 50)
+        try:
+            sys.stdout.write("\r" + " " * clear_len + "\r")
+            sys.stdout.flush()
+        except Exception:
+            pass
+
+    def __enter__(self) -> "ThinkingIndicator":
+        self.start()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        self.stop()
+
+
 def query_observer_coder(
     messages: list,
     server: str,
@@ -356,11 +422,13 @@ def query_observer_coder(
     temperature: float = 0.2,
     stream: bool = True,
     timeout: int = 180,
+    show_indicator: bool = True,
 ) -> Tuple[str, Dict[str, Any]]:
     """
     Sends request to /v1/chat/completions for observer-coder-1.0.
     Returns (response_text, metadata_dict).
     If stream=True, streams tokens directly to stdout.
+    Shows animated ThinkingIndicator until the first token arrives.
     """
     url = f"{server.rstrip('/')}/v1/chat/completions"
     payload = {
@@ -383,8 +451,12 @@ def query_observer_coder(
 
     full_text = []
     meta: Dict[str, Any] = {}
+    indicator = ThinkingIndicator("Thinking...") if show_indicator else None
 
     if stream:
+        started_streaming = False
+        if indicator:
+            indicator.start()
         try:
             with urllib.request.urlopen(req, timeout=timeout) as resp:
                 meta["track"] = resp.headers.get("x-observer-track")
@@ -402,19 +474,38 @@ def query_observer_coder(
                             delta = chunk["choices"][0]["delta"]
                             if "content" in delta:
                                 piece = delta["content"]
+                                if not started_streaming:
+                                    if indicator:
+                                        indicator.stop()
+                                        indicator = None
+                                    started_streaming = True
                                 full_text.append(piece)
                                 sys.stdout.write(piece)
                                 sys.stdout.flush()
                         except Exception:
                             pass
+            if indicator:
+                indicator.stop()
+                indicator = None
             print()
             return "".join(full_text), meta
         except urllib.error.HTTPError as err:
+            if indicator:
+                indicator.stop()
+                indicator = None
             err_body = err.read().decode("utf-8", errors="replace")
             raise RuntimeError(f"HTTP {err.code}: {err_body}")
+        finally:
+            if indicator:
+                indicator.stop()
     else:
+        if indicator:
+            indicator.start()
         try:
             with urllib.request.urlopen(req, timeout=timeout) as resp:
+                if indicator:
+                    indicator.stop()
+                    indicator = None
                 meta["track"] = resp.headers.get("x-observer-track")
                 meta["specialists"] = resp.headers.get("x-observer-specialists")
                 meta["latency_ms"] = resp.headers.get("x-observer-latency-ms")
@@ -427,8 +518,14 @@ def query_observer_coder(
                     meta["usage"] = body["usage"]
                 return text, meta
         except urllib.error.HTTPError as err:
+            if indicator:
+                indicator.stop()
+                indicator = None
             err_body = err.read().decode("utf-8", errors="replace")
             raise RuntimeError(f"HTTP {err.code}: {err_body}")
+        finally:
+            if indicator:
+                indicator.stop()
 
 
 LANGUAGE_DEFAULT_FILES = {
@@ -810,8 +907,11 @@ def cmd_chat(args: argparse.Namespace) -> int:
                             print("    [Skipped file creation. You can write it later with: /write]")
                     except (KeyboardInterrupt, EOFError):
                         pass
-            print()
-
+        except KeyboardInterrupt:
+            print("\n[Generation cancelled by user]\n")
+            if history:
+                history.pop()
+            continue
         except Exception as exc:
             print(f"\n[!] Error: {exc}\n", file=sys.stderr)
             if history:
