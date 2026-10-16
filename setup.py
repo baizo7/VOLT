@@ -4,6 +4,9 @@ setup(
     name="volt-ai",
     version="1.0.0",
     description="VOLT-AI: Intelligent Multi-Model AI Coordination, Routing, and Observability Engine",
+    author="S Sanjai (Baizo)",
+    url="https://github.com/baizo7/VOLT",
+    license="Custom Dual License (Model Open-Source / Platform Proprietary)",
     packages=find_packages(),
     entry_points={
         "console_scripts": [

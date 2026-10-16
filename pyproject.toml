@@ -8,6 +8,10 @@ version = "1.0.0"
 description = "VOLT-AI: Intelligent Multi-Model AI Coordination, Routing, and Observability Engine"
 readme = "README.md"
 requires-python = ">=3.9"
+authors = [
+    { name = "S Sanjai (Baizo)" }
+]
+license = { text = "Custom Dual License (Model Open-Source / Platform Proprietary)" }
 
 [project.optional-dependencies]
 server = [

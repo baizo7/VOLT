@@ -1,0 +1,47 @@
+VOLT-AI DUAL LICENSE & TERMS OF SERVICE
+===========================================
+Copyright (c) 2026 S Sanjai (Baizo / @baizo7). All Rights Reserved.
+
+This repository and the VOLT-AI ecosystem contain both proprietary platform components and open-source model assets, governed by the terms specified below.
+
+--------------------------------------------------------------------------------
+1. VOLT-AI OPEN-SOURCE MODEL GRANT (Open-Source)
+--------------------------------------------------------------------------------
+The VOLT-AI Model specifications, open model weights, fine-tuning recipes, and client-side inference adapters ("VOLT-AI Model Assets", including 'volt-ai-1.0') are released under the Apache License, Version 2.0 (the "License").
+
+You may obtain a copy of the License at:
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
+
+--------------------------------------------------------------------------------
+2. VOLT-AI PROPRIETARY PLATFORM & ENGINE (Protected / Source-Available)
+--------------------------------------------------------------------------------
+All other components of this repository—including but not limited to:
+  * The Multi-Model Coordination Engine and dynamic routing algorithms
+  * The Telemetry, Capture Proxy, and Observability Backend
+  * The Zero-Leak Secret Scrubbing Boundary and Security Pipeline
+  * The Real-time Glassmorphism Analytics Dashboard
+  * Database schemas, automated hooks, and enterprise infrastructure
+
+are the proprietary intellectual property of S Sanjai (Baizo).
+
+PERMITTED USES:
+  * You are granted a limited, non-exclusive, non-transferable license to inspect, evaluate, and run the client-side tooling (e.g., 'volt', 'volt-coder' CLI) locally on your personal or developer workstation for direct connection to authorized VOLT-AI endpoints.
+  * Personal, educational, and internal evaluation of the source code is permitted.
+
+RESTRICTIONS & RESERVED RIGHTS:
+  * Commercial Redistribution: You may not sell, rent, lease, sub-license, redistribute, or package the platform, proxy, or server engine for commercial distribution.
+  * Hosted / SaaS Services: You may not use the platform architecture or server code to offer a competing public proxy, commercial multi-model coordination service, or managed observability platform without express prior written consent from the author.
+  * Copyright Removal: You may not remove, obscure, or alter any copyright notices, credits, or branding from the codebase.
+
+--------------------------------------------------------------------------------
+3. MANDATORY ATTRIBUTION & CREDITS
+--------------------------------------------------------------------------------
+Any product, service, research paper, model derivation, or public showcase incorporating or connecting to VOLT-AI must include prominent and visible attribution:
+
+    "Powered by VOLT-AI — Created by Baizo (S Sanjai) | https://github.com/baizo7/VOLT"
+
+For commercial licensing, enterprise deployment rights, or questions, contact:
+    Creator & Lead Developer: S Sanjai (Baizo)
+    GitHub: https://github.com/baizo7
