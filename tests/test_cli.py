@@ -3,6 +3,7 @@ Unit tests for ObserverCoder CLI package.
 """
 import io
 import json
+import os
 import sys
 from unittest.mock import MagicMock, patch
 import pytest
@@ -156,3 +157,94 @@ def test_main_coder_argv_shorthand():
             assert mock_code.called
             called_args = mock_code.call_args[0][0]
             assert called_args.prompt == "Write quicksort in python"
+
+
+def test_extract_code_blocks():
+    from cli.main import extract_code_blocks
+
+    sample = """
+Here is your coffee shop webpage:
+
+```html index.html
+<!DOCTYPE html>
+<html><body><h1>Coffee</h1></body></html>
+```
+
+And your style:
+
+```css style.css
+body { background: #333; }
+```
+"""
+    blocks = extract_code_blocks(sample)
+    assert len(blocks) == 2
+    assert blocks[0]["filename"] == "index.html"
+    assert blocks[0]["language"] == "html"
+    assert "<h1>Coffee</h1>" in blocks[0]["code"]
+
+    assert blocks[1]["filename"] == "style.css"
+    assert blocks[1]["language"] == "css"
+    assert "background: #333;" in blocks[1]["code"]
+
+
+def test_extract_code_blocks_fallback_language():
+    from cli.main import extract_code_blocks
+
+    sample = """
+```python
+def add(a, b):
+    return a + b
+```
+"""
+    blocks = extract_code_blocks(sample)
+    assert len(blocks) == 1
+    assert blocks[0]["filename"] == "app.py"
+    assert "def add(a, b):" in blocks[0]["code"]
+
+
+def test_write_code_blocks(tmp_path):
+    from cli.main import write_code_blocks
+
+    blocks = [
+        {"filename": "coffee.html", "code": "<h1>Coffee Shop</h1>\n"},
+        {"filename": "sub/style.css", "code": "body { color: brown; }\n"},
+    ]
+    orig_cwd = os.getcwd()
+    try:
+        os.chdir(tmp_path)
+        written = write_code_blocks(blocks)
+        assert len(written) == 2
+        assert (tmp_path / "coffee.html").exists()
+        assert (tmp_path / "coffee.html").read_text(encoding="utf-8") == "<h1>Coffee Shop</h1>\n"
+        assert (tmp_path / "sub" / "style.css").exists()
+    finally:
+        os.chdir(orig_cwd)
+
+
+def test_cmd_chat_write_command(tmp_path):
+    orig_cwd = os.getcwd()
+    try:
+        os.chdir(tmp_path)
+        mock_args = MagicMock()
+        mock_args.server = "http://testserver"
+        mock_args.key = None
+        mock_args.user = None
+        mock_args.project = None
+        mock_args.write = False
+        mock_args.apply = False
+
+        html_reply = "Sure! Here is the code:\n```html index.html\n<!DOCTYPE html><html><body>Coffee</body></html>\n```\nEnjoy!"
+        # In chat session: user asks, model replies, then user types /write, then exit
+        with patch("cli.main.query_observer_coder", return_value=(html_reply, {"track": "fast_coding", "specialists": "fast_coder"})):
+            with patch("builtins.input", side_effect=[
+                "build coffee website",
+                "y",  # accept write prompt
+                "exit"
+            ]):
+                ret = cmd_chat(mock_args)
+                assert ret == 0
+                assert (tmp_path / "index.html").exists()
+                assert "Coffee" in (tmp_path / "index.html").read_text(encoding="utf-8")
+    finally:
+        os.chdir(orig_cwd)
+

@@ -8,6 +8,7 @@ import base64
 import json
 import mimetypes
 import os
+import re
 import sys
 import time
 import urllib.request
@@ -430,7 +431,108 @@ def query_observer_coder(
             raise RuntimeError(f"HTTP {err.code}: {err_body}")
 
 
+LANGUAGE_DEFAULT_FILES = {
+    "html": "index.html",
+    "htm": "index.html",
+    "css": "style.css",
+    "js": "script.js",
+    "javascript": "script.js",
+    "ts": "app.ts",
+    "typescript": "app.ts",
+    "py": "app.py",
+    "python": "app.py",
+    "json": "data.json",
+    "sql": "schema.sql",
+    "sh": "script.sh",
+    "bash": "script.sh",
+    "powershell": "script.ps1",
+    "ps1": "script.ps1",
+    "go": "main.go",
+    "rust": "main.rs",
+    "rs": "main.rs",
+    "c": "main.c",
+    "cpp": "main.cpp",
+    "java": "Main.java",
+    "md": "README.md",
+    "markdown": "README.md",
+    "yaml": "config.yaml",
+    "yml": "config.yml",
+}
+
+
+def extract_code_blocks(text: str) -> list[Dict[str, Any]]:
+    """
+    Extract code blocks from markdown text with intelligent filename detection.
+    Returns list of dicts: {"filename": str, "language": str, "code": str, "bytes": int}
+    """
+    pattern = r"```([a-zA-Z0-9_\-\.\+]+)?(?:[ \t]+([^\n\r`]+))?\r?\n(.*?)```"
+    matches = re.findall(pattern, text, re.DOTALL)
+    blocks = []
+
+    for i, (lang_raw, fname_raw, code_raw) in enumerate(matches):
+        lang = (lang_raw or "").strip().lower()
+        fname = (fname_raw or "").strip() if fname_raw else ""
+
+        # Normalize clean code
+        code = code_raw.rstrip() + "\n"
+
+        # Check if first line contains a filename comment (e.g. <!-- file: index.html --> or // file: app.js)
+        if not fname:
+            first_line = code.split("\n", 1)[0].strip()
+            comment_match = re.search(
+                r"(?:<!--|//|#|/\*)\s*(?:file(?:name)?|path):\s*([a-zA-Z0-9_\-\.\/\\]+)",
+                first_line,
+                re.IGNORECASE,
+            )
+            if comment_match:
+                fname = comment_match.group(1).strip()
+                code = "\n".join(code.split("\n")[1:]).lstrip()
+
+        # If still no filename, try to infer from language
+        if not fname:
+            fname = LANGUAGE_DEFAULT_FILES.get(lang, f"snippet_{i+1}.txt" if not lang else f"snippet_{i+1}.{lang}")
+
+        # Sanitize filename (prevent escape outside current workspace)
+        clean_fname = os.path.basename(fname) if ".." in fname else fname
+
+        blocks.append({
+            "filename": clean_fname,
+            "language": lang,
+            "code": code,
+            "bytes": len(code.encode("utf-8")),
+        })
+
+    return blocks
+
+
+def write_code_blocks(blocks: list[Dict[str, Any]], target_file: Optional[str] = None) -> list[str]:
+    """
+    Write extracted code blocks to disk. Creates parent directories if needed.
+    Returns list of written file paths.
+    """
+    written = []
+    if target_file and blocks:
+        block = blocks[0]
+        p = Path(target_file)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        with open(p, "w", encoding="utf-8") as f:
+            f.write(block["code"])
+        written.append(str(p))
+    else:
+        for block in blocks:
+            fname = block.get("filename")
+            if not fname:
+                continue
+            p = Path(fname)
+            p.parent.mkdir(parents=True, exist_ok=True)
+            with open(p, "w", encoding="utf-8") as f:
+                f.write(block["code"])
+            written.append(str(p))
+    return written
+
+
 def cmd_models(args: argparse.Namespace) -> int:
+
     """List the specialist models, fallback tiers, licenses, and tracks in ObserverCoder-1.0."""
     cfg = load_config()
     server = (getattr(args, "server", None) or get_server_url(cfg)).rstrip("/")
@@ -548,12 +650,31 @@ def cmd_code(args: argparse.Namespace) -> int:
             print(f"Tokens      : {u.get('prompt_tokens', 0)} in / {u.get('completion_tokens', 0)} out")
         print("=" * 55 + "\n")
 
+        # Extract clean code blocks
+        blocks = extract_code_blocks(text)
+
         # Save to output file if requested
         out_file = getattr(args, "output", None)
         if out_file:
-            with open(out_file, "w", encoding="utf-8") as out_f:
-                out_f.write(text)
-            print(f"[+] Output saved to: {out_file}")
+            if blocks:
+                write_code_blocks(blocks, target_file=out_file)
+            else:
+                with open(out_file, "w", encoding="utf-8") as out_f:
+                    out_f.write(text)
+            print(f"[+] Clean code written to: {out_file}")
+
+        # Auto-write files if --write or --apply is specified
+        if getattr(args, "write", False) or getattr(args, "apply", False):
+            if blocks:
+                written_paths = write_code_blocks(blocks)
+                for wp in written_paths:
+                    size = os.path.getsize(wp)
+                    print(f"[+] Created/Updated: {wp} ({size:,} bytes)")
+            else:
+                print("[!] No code blocks found to write.")
+        elif not out_file and blocks:
+            file_names = ", ".join(b["filename"] for b in blocks)
+            print(f"[Tip: Run with -w to automatically write detected file(s): {file_names}]")
 
         return 0
     except Exception as exc:
@@ -578,7 +699,7 @@ def cmd_chat(args: argparse.Namespace) -> int:
     print(" ObserverCoder-1.0 - Interactive Multi-Model Terminal")
     print(f" Server: {server}")
     print(" Type your code instructions or questions below.")
-    print(" Commands: /clear (reset context), /models (show roster), exit")
+    print(" Commands: /write [name], /apply, /ls, /models, /clear, exit")
     print("=" * 65 + "\n")
 
     history: list = []
@@ -602,15 +723,46 @@ def cmd_chat(args: argparse.Namespace) -> int:
         if prompt.lower() in ("/models", "/specialists"):
             cmd_models(args)
             continue
-        if prompt.lower().startswith("/save "):
-            filename = prompt[6:].strip()
-            if filename and history:
-                last_reply = history[-1].get("content", "") if history else ""
-                with open(filename, "w", encoding="utf-8") as sf:
-                    sf.write(last_reply)
-                print(f"[+] Last assistant response saved to {filename}\n")
+        if prompt.lower() in ("/help", "?"):
+            print("\nCommands:")
+            print("  /write [filename]  - Write extracted code from last response to disk")
+            print("  /apply             - Auto-extract and write all files to current directory")
+            print("  /ls or /dir        - List files in current directory")
+            print("  /models            - Show specialist model roster and tracks")
+            print("  /clear             - Clear conversation history")
+            print("  exit or quit       - Exit chat session\n")
+            continue
+        if prompt.lower() in ("/ls", "/dir"):
+            files = [f.name for f in Path(".").iterdir() if not f.name.startswith(".")]
+            print(f"\nFiles in {os.getcwd()}:")
+            for fn in files[:30]:
+                print(f"  • {fn}")
+            print()
+            continue
+        if prompt.lower().startswith("/write") or prompt.lower().startswith("/save") or prompt.lower() == "/apply":
+            parts = prompt.split(None, 1)
+            target_name = parts[1].strip() if len(parts) > 1 else None
+            if history:
+                last_reply = ""
+                for msg in reversed(history):
+                    if msg.get("role") == "assistant":
+                        last_reply = msg.get("content", "")
+                        break
+                blocks = extract_code_blocks(last_reply)
+                if blocks:
+                    written = write_code_blocks(blocks, target_file=target_name)
+                    for wp in written:
+                        print(f"[+] Created/Updated: {os.path.abspath(wp)} ({os.path.getsize(wp):,} bytes)")
+                    print()
+                else:
+                    if target_name and last_reply:
+                        with open(target_name, "w", encoding="utf-8") as f:
+                            f.write(last_reply)
+                        print(f"[+] Saved text response to {target_name}\n")
+                    else:
+                        print("[!] No code blocks found in the last response.\n")
             else:
-                print("[!] Nothing to save or filename missing.\n")
+                print("[!] No response to write yet.\n")
             continue
 
         history.append({"role": "user", "content": prompt})
@@ -628,7 +780,38 @@ def cmd_chat(args: argparse.Namespace) -> int:
             history.append({"role": "assistant", "content": text})
             track = meta.get("track") or "fast_coding"
             specialists = meta.get("specialists") or "fast_coder"
-            print(f"\n[Track: {track} | Specialist: {specialists}]\n")
+            print(f"\n[Track: {track} | Specialist: {specialists}]")
+
+            # Check if code blocks were generated and offer to write them
+            blocks = extract_code_blocks(text)
+            if blocks:
+                auto_write = getattr(args, "write", False) or getattr(args, "apply", False)
+                if auto_write:
+                    written_paths = write_code_blocks(blocks)
+                    for wp in written_paths:
+                        print(f"    [+] Created: {os.path.abspath(wp)} ({os.path.getsize(wp):,} bytes)")
+                else:
+                    file_list = ", ".join(b["filename"] for b in blocks)
+                    first_fname = blocks[0]["filename"]
+                    print(f"\n[Detected {len(blocks)} code file(s): {file_list}]")
+                    try:
+                        choice = input(
+                            f"[?] Write to disk now? (Press ENTER to write '{first_fname}', or type custom filename, or 'n' to skip): "
+                        ).strip()
+                        if choice.lower() in ("", "y", "yes"):
+                            written_paths = write_code_blocks(blocks)
+                            for wp in written_paths:
+                                print(f"    [+] Created: {os.path.abspath(wp)} ({os.path.getsize(wp):,} bytes)")
+                        elif choice.lower() not in ("n", "no", "skip"):
+                            written_paths = write_code_blocks(blocks, target_file=choice)
+                            for wp in written_paths:
+                                print(f"    [+] Created: {os.path.abspath(wp)} ({os.path.getsize(wp):,} bytes)")
+                        else:
+                            print("    [Skipped file creation. You can write it later with: /write]")
+                    except (KeyboardInterrupt, EOFError):
+                        pass
+            print()
+
         except Exception as exc:
             print(f"\n[!] Error: {exc}\n", file=sys.stderr)
             if history:
@@ -660,6 +843,7 @@ def main() -> int:
     p_code.add_argument("-f", "--file", help="File context to attach to prompt")
     p_code.add_argument("-i", "--image", help="Image or UI mockup file for visual inspection (Qwen2-VL)")
     p_code.add_argument("-o", "--output", help="Save generated response directly to file")
+    p_code.add_argument("-w", "--write", "-a", "--apply", action="store_true", help="Auto-write detected code blocks directly to files in the current directory")
     p_code.add_argument("--no-stream", action="store_true", help="Disable live streaming output")
     p_code.add_argument("--temperature", type=float, default=0.2, help="Sampling temperature (default: 0.2)")
     p_code.add_argument("--server", help="Observer server URL")
@@ -669,10 +853,12 @@ def main() -> int:
 
     # chat (ObserverCoder-1.0 multi-turn interactive session)
     p_chat = subparsers.add_parser("chat", help="Start an interactive multi-turn coding session with ObserverCoder-1.0")
+    p_chat.add_argument("-w", "--write", "-a", "--apply", action="store_true", help="Automatically write all generated code blocks without prompting")
     p_chat.add_argument("--server", help="Observer server URL")
     p_chat.add_argument("--key", help="API key")
     p_chat.add_argument("--user", help="Developer username")
     p_chat.add_argument("--project", help="Project name")
+
 
     # models / specialists
     p_models = subparsers.add_parser("models", aliases=["specialists"], help="List specialist models and routing tracks in ObserverCoder-1.0")
