@@ -111,8 +111,14 @@ async def test_admin_prune_endpoint(async_client, monkeypatch):
     mock_pool.acquire.return_value = mock_acquire
 
     monkeypatch.setattr(main, "pool", mock_pool)
+    monkeypatch.setenv("OBSERVER_ADMIN_KEY", "admin-prune-secret")
 
-    resp = await async_client.post("/admin/prune?days=30")
+    # Unauthorized -> 401
+    resp_unauth = await async_client.post("/admin/prune?days=30")
+    assert resp_unauth.status_code == 401
+
+    # Authorized -> 200
+    resp = await async_client.post("/admin/prune?days=30", headers={"X-Admin-Token": "admin-prune-secret"})
     assert resp.status_code == 200
     data = resp.json()
     assert data["ok"] is True

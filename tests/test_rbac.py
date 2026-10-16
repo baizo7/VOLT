@@ -35,14 +35,19 @@ def test_mask_and_hash_api_key():
 @pytest.mark.asyncio
 async def test_admin_auth_checks(async_client, monkeypatch):
     monkeypatch.setenv("OBSERVER_ADMIN_KEY", "super-secret-admin-pass")
+    main.ADMIN_FAILED_ATTEMPTS.clear()
 
-    # Reject unauthorized
+    # Reject unauthorized / missing token
     resp = await async_client.get("/admin/connected-users")
     assert resp.status_code == 401
     assert "admin privileges required" in resp.json()["error"]
 
     resp = await async_client.get("/admin/verify")
     assert resp.status_code == 401
+
+    # Reject wrong key
+    resp_wrong = await async_client.get("/admin/verify", headers={"X-Admin-Token": "wrong-password"})
+    assert resp_wrong.status_code == 401
 
     # Accept with X-Admin-Token
     headers = {"X-Admin-Token": "super-secret-admin-pass"}
@@ -54,6 +59,42 @@ async def test_admin_auth_checks(async_client, monkeypatch):
     # Accept with query param ?admin_token=...
     resp = await async_client.get("/admin/verify?admin_token=super-secret-admin-pass")
     assert resp.status_code == 200
+
+    # Accept with POST JSON body
+    resp_post = await async_client.post("/admin/verify", json={"admin_key": "super-secret-admin-pass"})
+    assert resp_post.status_code == 200
+    assert resp_post.json()["role"] == "admin"
+
+
+@pytest.mark.asyncio
+async def test_admin_auth_unset_key_strictly_denies(async_client, monkeypatch):
+    monkeypatch.delenv("OBSERVER_ADMIN_KEY", raising=False)
+    monkeypatch.delenv("OBSERVER_ADMIN_TOKEN", raising=False)
+    monkeypatch.delenv("OBSERVER_AUTH_TOKEN", raising=False)
+    main.ADMIN_FAILED_ATTEMPTS.clear()
+
+    # Even if someone sends a token or query, unset admin key strictly denies access
+    resp = await async_client.get("/admin/verify?admin_token=anything")
+    assert resp.status_code == 401
+    assert "invalid admin key" in resp.json()["error"]
+
+
+@pytest.mark.asyncio
+async def test_admin_verify_brute_force_lockout(async_client, monkeypatch):
+    monkeypatch.setenv("OBSERVER_ADMIN_KEY", "super-secret-admin-pass")
+    main.ADMIN_FAILED_ATTEMPTS.clear()
+
+    # Send 5 incorrect attempts
+    for i in range(5):
+        resp = await async_client.post("/admin/verify", json={"admin_key": f"bad-attempt-{i}"})
+        assert resp.status_code == 401
+
+    # 6th attempt should be locked out with 429 Too Many Requests
+    resp_locked = await async_client.post("/admin/verify", json={"admin_key": "super-secret-admin-pass"})
+    assert resp_locked.status_code == 429
+    assert "Too many failed admin login attempts" in resp_locked.json()["error"]
+    assert "Retry-After" in resp_locked.headers
+
 
 
 @pytest.mark.asyncio

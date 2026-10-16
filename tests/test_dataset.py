@@ -175,6 +175,7 @@ async def test_export_sft_and_dpo_datasets_mocked():
 async def test_api_export_dataset_endpoint(async_client, monkeypatch):
     mock_pool = MagicMock()
     monkeypatch.setattr(main, "pool", mock_pool)
+    monkeypatch.setenv("OBSERVER_ADMIN_KEY", "test-admin-dataset-key")
 
     mock_sft = [
         {
@@ -196,7 +197,16 @@ async def test_api_export_dataset_endpoint(async_client, monkeypatch):
         "val_split": 0.0,
         "limit": 10
     }
-    resp = await async_client.post("/admin/export-dataset", json=payload)
+    # Unauthenticated rejected
+    resp_unauth = await async_client.post("/admin/export-dataset", json=payload)
+    assert resp_unauth.status_code == 401
+
+    # Authenticated accepted
+    resp = await async_client.post(
+        "/admin/export-dataset",
+        json=payload,
+        headers={"X-Admin-Token": "test-admin-dataset-key"}
+    )
     assert resp.status_code == 200
     data = resp.json()
     assert data["ok"] is True
@@ -209,6 +219,7 @@ async def test_api_export_dataset_endpoint(async_client, monkeypatch):
 async def test_api_dataset_stats_endpoint(async_client, monkeypatch):
     mock_pool = MagicMock()
     monkeypatch.setattr(main, "pool", mock_pool)
+    monkeypatch.setenv("OBSERVER_ADMIN_KEY", "test-admin-dataset-key")
 
     async def mock_export_sft(pool, **kwargs):
         return [{"messages": [], "metadata": {}}]
@@ -219,7 +230,15 @@ async def test_api_dataset_stats_endpoint(async_client, monkeypatch):
     monkeypatch.setattr("main.export_sft_dataset", mock_export_sft)
     monkeypatch.setattr("main.export_dpo_dataset", mock_export_dpo)
 
-    resp = await async_client.get("/admin/dataset/stats")
+    # Unauthenticated rejected
+    resp_unauth = await async_client.get("/admin/dataset/stats")
+    assert resp_unauth.status_code == 401
+
+    # Authenticated accepted
+    resp = await async_client.get(
+        "/admin/dataset/stats",
+        headers={"X-Admin-Token": "test-admin-dataset-key"}
+    )
     assert resp.status_code == 200
     data = resp.json()
     assert data["ok"] is True

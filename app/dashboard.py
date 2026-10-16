@@ -391,9 +391,13 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       <button onclick="submitDeveloperLogin()" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 font-bold text-[11px] text-white rounded-lg transition shadow-md">Enter Personal Dashboard</button>
     </div>
     <div id="modal-tab-admin" class="space-y-3 hidden">
-      <p class="text-[11px] text-slate-400">Log in with administrator key. Grants <strong>full global team visibility</strong> across all connected developers, total token consumption, system-wide task traces, and dataset curation exports.</p>
+      <p class="text-[11px] text-slate-400">Log in with the exact administrator key. Grants <strong>full global team visibility</strong> across all connected developers, total token consumption, system-wide task traces, and dataset curation exports.</p>
       <input id="modal-input-admin-key" type="password" placeholder="Enter OBSERVER_ADMIN_KEY" class="w-full px-3 py-2 text-xs bg-surface-950 border border-surface-700 rounded-lg text-white focus:outline-none focus:border-indigo-500">
-      <button onclick="submitAdminLogin()" class="w-full py-2.5 bg-violet-600 hover:bg-violet-500 font-bold text-[11px] text-white rounded-lg transition shadow-md">Unlock Admin Dashboard</button>
+      <div id="modal-admin-error" class="hidden text-rose-400 text-xs font-semibold px-2.5 py-1.5 bg-rose-950/60 border border-rose-800/60 rounded-lg"></div>
+      <button onclick="submitAdminLogin()" id="btn-admin-submit" class="w-full py-2.5 bg-violet-600 hover:bg-violet-500 font-bold text-[11px] text-white rounded-lg transition shadow-md flex items-center justify-center gap-2">
+        <span id="admin-login-spinner" class="hidden h-3 w-3 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+        <span>Unlock Admin Dashboard</span>
+      </button>
     </div>
   </div>
 </div>
@@ -437,9 +441,26 @@ function estimateCost(model, inTok, outTok) {
 function fmtCost(v) { return v < 0.01 ? '<$0.01' : '$' + v.toFixed(2); }
 
 // ────────── Init ──────────
-function initAuth() {
-  if (S.adminToken) S.role = 'admin';
-  else if (S.user) S.role = 'dev';
+async function initAuth() {
+  if (S.adminToken) {
+    try {
+      const r = await fetch('/admin/verify', {
+        headers: { 'X-Admin-Token': S.adminToken, 'Authorization': 'Bearer ' + S.adminToken }
+      });
+      if (r.ok) {
+        const d = await r.json();
+        if (d.ok && d.role === 'admin') {
+          S.role = 'admin';
+          updateUIForRole();
+          return;
+        }
+      }
+    } catch(e) {}
+    // If validation fails, wipe invalid token
+    S.adminToken = '';
+    localStorage.removeItem('ao_admin_token');
+  }
+  if (S.user) S.role = 'dev';
   else { S.role = 'dev'; S.user = 'dev'; }
   updateUIForRole();
 }
@@ -969,12 +990,57 @@ function submitDeveloperLogin() {
   closeAccessModal(); updateUIForRole(); fetchData(); initWebSocket(); fetchQuotas();
 }
 async function submitAdminLogin() {
-  const key = document.getElementById('modal-input-admin-key').value.trim(); if (!key) return;
+  const inputEl = document.getElementById('modal-input-admin-key');
+  const errorEl = document.getElementById('modal-admin-error');
+  const spinner = document.getElementById('admin-login-spinner');
+  const btn = document.getElementById('btn-admin-submit');
+  const key = inputEl.value.trim();
+  if (errorEl) errorEl.classList.add('hidden');
+  if (!key) {
+    if (errorEl) { errorEl.textContent = 'Please enter the OBSERVER_ADMIN_KEY.'; errorEl.classList.remove('hidden'); }
+    return;
+  }
+  if (btn) btn.disabled = true;
+  if (spinner) spinner.classList.remove('hidden');
+
   try {
-    const r = await fetch('/admin/verify', { headers: { 'X-Admin-Token': key, 'Authorization': 'Bearer '+key } });
-    if (r.ok) { S.role='admin'; S.adminToken=key; S.filterUser=null; localStorage.setItem('ao_admin_token',key); closeAccessModal(); updateUIForRole(); fetchData(); initWebSocket(); fetchQuotas(); }
-    else alert('Invalid Admin Key.');
-  } catch(e) { alert('Error: '+e); }
+    const r = await fetch('/admin/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Token': key, 'Authorization': 'Bearer ' + key },
+      body: JSON.stringify({ admin_key: key })
+    });
+    if (r.ok) {
+      const d = await r.json();
+      if (d.ok && d.role === 'admin') {
+        S.role = 'admin';
+        S.adminToken = key;
+        S.filterUser = null;
+        localStorage.setItem('ao_admin_token', key);
+        closeAccessModal();
+        updateUIForRole();
+        fetchData();
+        initWebSocket();
+        fetchQuotas();
+        if (btn) btn.disabled = false;
+        if (spinner) spinner.classList.add('hidden');
+        return;
+      }
+    }
+    const errData = await r.json().catch(() => ({}));
+    if (errorEl) {
+      errorEl.textContent = errData.error || 'Access Denied: Invalid admin key.';
+      errorEl.classList.remove('hidden');
+    }
+    inputEl.value = '';
+    inputEl.focus();
+  } catch(e) {
+    if (errorEl) {
+      errorEl.textContent = 'Verification error: ' + e;
+      errorEl.classList.remove('hidden');
+    }
+  }
+  if (btn) btn.disabled = false;
+  if (spinner) spinner.classList.add('hidden');
 }
 
 // ────────── Phase 6: WebSockets Live Stream ──────────

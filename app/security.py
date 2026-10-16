@@ -132,16 +132,19 @@ def hash_api_key(key: Optional[str]) -> str:
 def check_admin_auth(request: Request) -> bool:
     """
     Verify whether the incoming request has valid Administrator access.
-    Checks against OBSERVER_ADMIN_KEY, OBSERVER_ADMIN_TOKEN, or fallback OBSERVER_AUTH_TOKEN.
+    Strictly checks against OBSERVER_ADMIN_KEY, OBSERVER_ADMIN_TOKEN, or OBSERVER_AUTH_TOKEN.
+    Only the exact matching key will grant admin access.
     """
     admin_key = (
         os.environ.get("OBSERVER_ADMIN_KEY")
         or os.environ.get("OBSERVER_ADMIN_TOKEN")
         or os.environ.get("OBSERVER_AUTH_TOKEN")
     )
-    if not admin_key:
-        # When unconfigured in local development/tests, default to open admin if REQUIRE_AUTH is false
-        return os.environ.get("REQUIRE_AUTH", "").lower() not in ("true", "1")
+    if not admin_key or not admin_key.strip():
+        # Strict security: If admin key is not configured, NO ONE can authenticate as admin
+        return False
+
+    admin_key = admin_key.strip()
 
     # Candidate 1: X-Admin-Token header
     admin_header = request.headers.get("x-admin-token", "").strip()

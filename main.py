@@ -22,6 +22,7 @@ import asyncio
 from datetime import datetime, timezone
 import json
 import os
+import secrets
 import time
 import uuid
 from contextlib import asynccontextmanager
@@ -1166,11 +1167,49 @@ async def admin_connected_users_endpoint(request: Request):
     return {"ok": True, "users": users}
 
 
-@app.get("/admin/verify")
+# Rate limiter and lockout protection for admin authentication
+ADMIN_FAILED_ATTEMPTS: Dict[str, List[float]] = {}
+MAX_ADMIN_FAILED_ATTEMPTS = 5
+LOCKOUT_WINDOW_SECONDS = 60
+
+
+@app.api_route("/admin/verify", methods=["GET", "POST"])
 async def admin_verify_endpoint(request: Request):
-    """Verify admin authorization status."""
-    if not check_admin_auth(request):
-        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    """Verify admin authorization status with brute-force lockout protection."""
+    client_ip = request.client.host if request.client else "unknown"
+    now = time.time()
+
+    attempts = [t for t in ADMIN_FAILED_ATTEMPTS.get(client_ip, []) if now - t < LOCKOUT_WINDOW_SECONDS]
+    ADMIN_FAILED_ATTEMPTS[client_ip] = attempts
+
+    if len(attempts) >= MAX_ADMIN_FAILED_ATTEMPTS:
+        retry_after = int(LOCKOUT_WINDOW_SECONDS - (now - attempts[0]))
+        return JSONResponse(
+            {"error": f"Too many failed admin login attempts. Locked out for {max(1, retry_after)} seconds."},
+            status_code=429,
+            headers={"Retry-After": str(max(1, retry_after))},
+        )
+
+    # Validate admin credentials via headers, query parameters, or JSON body
+    valid = check_admin_auth(request)
+    if not valid and request.method == "POST":
+        try:
+            body = await request.json()
+            key_candidate = body.get("admin_key") or body.get("key") or body.get("token")
+            admin_key = os.environ.get("OBSERVER_ADMIN_KEY") or os.environ.get("OBSERVER_ADMIN_TOKEN")
+            if key_candidate and admin_key and secrets.compare_digest(str(key_candidate).strip(), admin_key.strip()):
+                valid = True
+        except Exception:
+            pass
+
+    if not valid:
+        attempts.append(now)
+        ADMIN_FAILED_ATTEMPTS[client_ip] = attempts
+        logger.warning(f"Failed admin authentication attempt from {client_ip} ({len(attempts)}/{MAX_ADMIN_FAILED_ATTEMPTS})")
+        return JSONResponse({"error": "unauthorized: invalid admin key"}, status_code=401)
+
+    # Success: reset failed attempt counter
+    ADMIN_FAILED_ATTEMPTS.pop(client_ip, None)
     return {"ok": True, "role": "admin"}
 
 
