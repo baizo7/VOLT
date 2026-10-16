@@ -148,14 +148,11 @@ def check_admin_auth(request: Request) -> bool:
 
     admin_key = admin_key.strip()
 
-    # Candidate 1: X-Volt-Token or X-Admin-Token header
-    volt_header = request.headers.get("x-volt-token", "").strip()
-    if volt_header and secrets.compare_digest(volt_header, admin_key):
-        return True
-
-    admin_header = request.headers.get("x-admin-token", "").strip()
-    if admin_header and secrets.compare_digest(admin_header, admin_key):
-        return True
+    # Candidate 1: X-Volt-Token, X-Volt-Key, X-Admin-Token, or X-Admin-Key headers
+    for h_name in ("x-volt-token", "x-volt-key", "x-admin-token", "x-admin-key"):
+        h_val = request.headers.get(h_name, "").strip()
+        if h_val and secrets.compare_digest(h_val, admin_key):
+            return True
 
     # Candidate 2: Authorization header
     auth_header = request.headers.get("authorization", "").strip()
@@ -171,14 +168,11 @@ def check_admin_auth(request: Request) -> bool:
     if obs_token and secrets.compare_digest(obs_token, admin_key):
         return True
 
-    # Candidate 4: Query parameter ?admin_token=... or ?token=...
-    q_admin = request.query_params.get("admin_token", "").strip()
-    if q_admin and secrets.compare_digest(q_admin, admin_key):
-        return True
-
-    q_token = request.query_params.get("token", "").strip()
-    if q_token and secrets.compare_digest(q_token, admin_key):
-        return True
+    # Candidate 4: Query parameter ?admin_token=... or ?admin_key=... or ?token=...
+    for q_name in ("admin_token", "admin_key", "token"):
+        q_val = request.query_params.get(q_name, "").strip()
+        if q_val and secrets.compare_digest(q_val, admin_key):
+            return True
 
     return False
 
