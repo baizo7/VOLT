@@ -84,7 +84,7 @@ def cmd_activate(args: argparse.Namespace) -> int:
         if input_proj:
             project = input_proj
         if not key:
-            input_key = input("Your Personal API Key (e.g. Google Gemini AI Studio key) [press enter to keep empty]: ").strip()
+            input_key = input("Your Personal API Key (Gemini, Claude, OpenRouter, or OpenAI) [press enter to keep empty]: ").strip()
             if input_key:
                 key = input_key
 
@@ -112,32 +112,66 @@ def cmd_activate(args: argparse.Namespace) -> int:
     print(f"[+] Saved configuration to: {CONFIG_FILE}")
 
     proxy_v1 = f"{server}/v1"
+    is_claude = bool(key and key.startswith("sk-ant"))
+
     print("\n" + "=" * 60)
     print("AI Observer is activated for your terminal!")
     print("=" * 60)
     print(f"Developer ID : {user}")
     print(f"Project      : {project}")
     print(f"Proxy BaseURL: {proxy_v1}")
+    if is_claude:
+        print(f"Detected Key : Anthropic Claude ({key[:10]}...)")
+    elif key:
+        print(f"Detected Key : Custom / Provider ({key[:8]}...)")
+    else:
+        print("Detected Key : None (ObserverCoder cloud fallback active)")
     print("=" * 60)
 
     print("\nTo route your current terminal session through the Observer, run:")
     if sys.platform == "win32":
-        print("  PowerShell:")
-        print(f'    $env:OPENAI_BASE_URL="{proxy_v1}"')
-        if key:
-            print(f'    $env:OPENAI_API_KEY="{key}"')
-        print(f'    $env:OBSERVER_TASK_ID="{project}"')
+        if is_claude:
+            print("  PowerShell (Anthropic / Claude):")
+            print(f'    $env:ANTHROPIC_BASE_URL="{server}"')
+            print(f'    $env:ANTHROPIC_API_KEY="{key}"')
+            print(f'    $env:OBSERVER_TASK_ID="{project}"')
+        else:
+            print("  PowerShell (OpenAI / Gemini / OpenRouter):")
+            print(f'    $env:OPENAI_BASE_URL="{proxy_v1}"')
+            if key:
+                print(f'    $env:OPENAI_API_KEY="{key}"')
+            print(f'    $env:OBSERVER_TASK_ID="{project}"')
+            print("  PowerShell (Anthropic / Claude Messages API):")
+            print(f'    $env:ANTHROPIC_BASE_URL="{server}"')
+            if key:
+                print(f'    $env:ANTHROPIC_API_KEY="{key}"')
     else:
-        print("  Bash / Zsh:")
-        print(f'    export OPENAI_BASE_URL="{proxy_v1}"')
-        if key:
-            print(f'    export OPENAI_API_KEY="{key}"')
-        print(f'    export OBSERVER_TASK_ID="{project}"')
+        if is_claude:
+            print("  Bash / Zsh (Anthropic / Claude):")
+            print(f'    export ANTHROPIC_BASE_URL="{server}"')
+            print(f'    export ANTHROPIC_API_KEY="{key}"')
+            print(f'    export OBSERVER_TASK_ID="{project}"')
+        else:
+            print("  Bash / Zsh (OpenAI / Gemini / OpenRouter):")
+            print(f'    export OPENAI_BASE_URL="{proxy_v1}"')
+            if key:
+                print(f'    export OPENAI_API_KEY="{key}"')
+            print(f'    export OBSERVER_TASK_ID="{project}"')
+            print("  Bash / Zsh (Anthropic / Claude Messages API):")
+            print(f'    export ANTHROPIC_BASE_URL="{server}"')
+            if key:
+                print(f'    export ANTHROPIC_API_KEY="{key}"')
 
     print("\nFor IDEs (Cursor / VS Code Continue / Cline):")
-    print(f"  - Override Base URL: {proxy_v1}")
-    print(f"  - Model            : gemini-3.1-flash-lite-preview (or gemini-3.8-flash)")
-    print(f"  - API Key          : your personal key")
+    if is_claude:
+        print(f"  - Provider         : Anthropic")
+        print(f"  - Override Base URL: {server}")
+        print(f"  - Model            : claude-3-5-sonnet-20241022 (or claude-3-5-haiku)")
+        print(f"  - API Key          : your Claude key")
+    else:
+        print(f"  - Override Base URL: {proxy_v1}")
+        print(f"  - Model            : gemini-3.1-flash-lite-preview, claude-3-5-sonnet, or gpt-4o")
+        print(f"  - API Key          : your personal key")
     print("=" * 60)
     return 0
 
