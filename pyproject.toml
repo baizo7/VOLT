@@ -21,3 +21,4 @@ server = [
 
 [project.scripts]
 observer = "cli.main:main"
+observer-coder = "cli.main:main_coder"

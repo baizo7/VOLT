@@ -8,6 +8,7 @@ setup(
     entry_points={
         "console_scripts": [
             "observer=cli.main:main",
+            "observer-coder=cli.main:main_coder",
         ],
     },
     python_requires=">=3.9",
