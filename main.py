@@ -1265,6 +1265,67 @@ async def user_profile_endpoint(request: Request, user: Optional[str] = None):
     return {"ok": True, "profile": profile}
 
 
+@app.post("/api/keys/generate")
+async def generate_api_key_endpoint(request: Request):
+    """
+    Generate a new VOLT-AI developer API key for accessing the model.
+    Tracks developer session, assigns free daily quota, and logs to developer_keys table.
+    """
+    body = {}
+    try:
+        body = await request.json()
+    except Exception:
+        pass
+
+    dev_name = (
+        body.get("name")
+        or body.get("user")
+        or request.headers.get("x-session-id")
+        or "dev-" + secrets.token_hex(4)
+    ).strip()
+    project = body.get("project", "default").strip()
+
+    # Generate genuine volt API key: volt_live_<32 hex chars>
+    raw_key = f"volt_live_{secrets.token_hex(16)}"
+    key_hash = hash_api_key(raw_key)
+    key_masked = f"{raw_key[:12]}...{raw_key[-4:]}"
+
+    if pool is not None:
+        try:
+            await record_developer_key(
+                pool=pool,
+                key_hash=key_hash,
+                session_id=dev_name,
+                project=project,
+                key_masked=key_masked,
+                provider="volt-portal",
+                model="VOLT-AI",
+            )
+        except Exception as e:
+            logger.warning(f"Failed to record newly generated key: {e}")
+
+    base_url = str(request.base_url).rstrip("/") + "/v1"
+    daily_quota = int(os.environ.get("VOLT_PORTAL_KEY_LIMIT", "50"))
+
+    return {
+        "ok": True,
+        "api_key": raw_key,
+        "key_masked": key_masked,
+        "session_id": dev_name,
+        "model": "VOLT-AI",
+        "daily_quota": daily_quota,
+        "base_url": base_url,
+        "tier": "community_developer",
+        "data_collection": "active",
+        "instructions": {
+            "curl": f'curl {base_url}/chat/completions -H "Authorization: Bearer {raw_key}" -d \'{{"model":"VOLT-AI","messages":[{{"role":"user","content":"Hello"}}]}}\'',
+            "powershell": f'$env:OPENAI_BASE_URL="{base_url}"; $env:OPENAI_API_KEY="{raw_key}"',
+            "bash": f'export OPENAI_BASE_URL="{base_url}"; export OPENAI_API_KEY="{raw_key}"',
+            "python": f'from openai import OpenAI\nclient = OpenAI(base_url="{base_url}", api_key="{raw_key}")\nres = client.chat.completions.create(model="VOLT-AI", messages=[{{"role":"user","content":"Hello"}}])',
+        }
+    }
+
+
 @app.get("/stats/timeseries")
 async def stats_timeseries(request: Request, days: int = 7, session_id: Optional[str] = None, project: Optional[str] = None):
     """Daily aggregated call metrics for dashboard time-series charts."""

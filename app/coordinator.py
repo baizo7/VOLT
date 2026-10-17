@@ -170,6 +170,44 @@ def analyze_intent(messages: List[Dict[str, Any]]) -> Dict[str, Any]:
     }
 
 
+_IN_MEMORY_DAILY_CALLS: Dict[str, List[float]] = {}
+
+
+def get_in_memory_call_count(tracker_id: str) -> int:
+    now = time.time()
+    cutoff = now - 86400
+    ts_list = _IN_MEMORY_DAILY_CALLS.get(tracker_id, [])
+    ts_list = [t for t in ts_list if t >= cutoff]
+    _IN_MEMORY_DAILY_CALLS[tracker_id] = ts_list
+    return len(ts_list)
+
+
+def record_in_memory_call(tracker_id: str):
+    now = time.time()
+    if tracker_id not in _IN_MEMORY_DAILY_CALLS:
+        _IN_MEMORY_DAILY_CALLS[tracker_id] = []
+    _IN_MEMORY_DAILY_CALLS[tracker_id].append(now)
+
+
+async def count_recent_calls(pool: Any, session_id: str, tracker_id: str) -> int:
+    mem_cnt = get_in_memory_call_count(tracker_id)
+    if pool is None:
+        return mem_cnt
+    try:
+        async with pool.acquire() as c:
+            row = await c.fetchrow("""
+                SELECT COUNT(*) as cnt
+                FROM llm_calls
+                WHERE ts >= NOW() - INTERVAL '24 hours'
+                  AND session_id = $1
+            """, session_id)
+            db_cnt = int(row["cnt"]) if row else 0
+            return max(db_cnt, mem_cnt)
+    except Exception as e:
+        logger.debug(f"Failed to query recent calls from DB: {e}")
+        return mem_cnt
+
+
 async def call_specialist(
     client: httpx.AsyncClient,
     specialist_key: str,
@@ -210,11 +248,19 @@ async def call_specialist(
         url = route["base_url"].rstrip("/") + "/chat/completions"
         headers = {"Content-Type": "application/json"}
         api_key = os.environ.get(route.get("api_key_env") or "")
-        # BYOK: Prioritize user's provided API key so usage is billed to their account
-        if client_auth_header and not target_model.startswith("local/"):
+
+        # BYOK: Prioritize user's provided direct provider API key so usage is billed to their account.
+        # If client has a portal key (volt_live_...) or free starter tier, fall back to server env key.
+        is_direct_provider_key = bool(
+            client_auth_header
+            and not ("volt_live_" in client_auth_header or "volt_" in client_auth_header)
+        )
+        if is_direct_provider_key and not target_model.startswith("local/"):
             headers["Authorization"] = client_auth_header
         elif api_key:
             headers["Authorization"] = f"Bearer {api_key}"
+        elif client_auth_header and not target_model.startswith("local/"):
+            headers["Authorization"] = client_auth_header
 
         # Strip 'local/' prefix when transmitting model name to local runner
         wire_model = target_model[6:] if target_model.startswith("local/") else target_model
@@ -316,44 +362,116 @@ async def coordinate_request(
         if not (observer_token and client_key == observer_token):
             client_auth = client_raw if client_raw.lower().startswith("bearer ") else f"Bearer {client_raw}"
 
-    # BYOK Enforcement: Check if user provided an LLM provider API key to access VOLT-AI
+    # Identify Key Type:
+    # 1. Portal Generated Key: starts with 'volt_live_' or 'volt_'
+    # 2. BYOK Provider Key: e.g. OpenRouter, DeepSeek, Gemini, OpenAI
+    # 3. No Key / Dummy Key: Free Starter Tier (Option 1)
+    is_portal_key = bool(client_key and (client_key.startswith("volt_live_") or client_key.startswith("volt_")))
     dummy_keys = {"", "none", "null", "volt-cloud", "anonymous", "undefined"}
     is_missing_or_dummy = not client_key or client_key.lower() in dummy_keys or len(client_key) < 6
 
-    # Allow disabling BYOK enforcement via environment flag if explicitly set (default: True)
-    require_user_key = os.environ.get("VOLT_REQUIRE_USER_KEY", "1").lower() in ("1", "true", "yes")
+    dev_session = (
+        request.headers.get("x-session-id")
+        or request.headers.get("x-user")
+        or request.headers.get("user")
+        or (request.client.host if request.client else "anonymous-session")
+    )
+    effective_project = project or request.headers.get("x-project") or "default"
 
-    if require_user_key and is_missing_or_dummy:
-        logger.warning("VOLT-AI request rejected: Missing or invalid user API key (BYOK required).")
-        return JSONResponse(
-            {
-                "error": {
-                    "message": (
-                        "VOLT-AI operates on a Bring-Your-Own-Key (BYOK) model. "
-                        "Please provide your own LLM provider API key (OpenRouter, DeepSeek, Gemini, or OpenAI) "
-                        "in the 'Authorization: Bearer <your-key>' header or configure it via 'volt activate'."
-                    ),
-                    "type": "authentication_required",
-                    "code": 401,
-                    "param": "Authorization",
+    free_tier_enabled = os.environ.get("VOLT_FREE_TIER", "1").lower() in ("1", "true", "yes")
+    free_daily_limit = int(os.environ.get("VOLT_FREE_DAILY_LIMIT", "30"))
+    portal_key_limit = int(os.environ.get("VOLT_PORTAL_KEY_LIMIT", "50"))
+
+    tier_label = "byok_unlimited"
+    free_remaining = None
+
+    if is_portal_key:
+        tier_label = "portal_key"
+        k_hash = hash_api_key(client_key)
+        tracker_id = f"portal:{k_hash}"
+        recent_calls = await count_recent_calls(pool, session_id=dev_session, tracker_id=tracker_id)
+        if recent_calls >= portal_key_limit:
+            logger.warning(f"VOLT-AI Portal Key limit reached for key {client_key[:12]}: {recent_calls}/{portal_key_limit}")
+            return JSONResponse(
+                {
+                    "error": {
+                        "message": (
+                            f"Daily quota reached for your VOLT API key ({recent_calls}/{portal_key_limit} requests today). "
+                            "To get unlimited usage, enter your personal provider API key (OpenRouter, DeepSeek, or Gemini) "
+                            "or visit the VOLT portal to manage your key: https://volt-ai-lmgz.onrender.com"
+                        ),
+                        "type": "quota_exceeded",
+                        "code": 429,
+                    }
+                },
+                status_code=429,
+                headers={
+                    "x-volt-tier": "portal_key",
+                    "x-volt-free-remaining": "0",
+                    "x-volt-quota-status": "exceeded",
                 }
-            },
-            status_code=401,
-            headers={
-                "WWW-Authenticate": 'Bearer realm="VOLT-AI BYOK"',
-                "x-volt-byok": "required",
-            },
-        )
+            )
+        free_remaining = max(0, portal_key_limit - recent_calls - 1)
+
+    elif is_missing_or_dummy:
+        if free_tier_enabled:
+            tracker_id = f"free:{dev_session}"
+            recent_calls = await count_recent_calls(pool, session_id=dev_session, tracker_id=tracker_id)
+            if recent_calls >= free_daily_limit:
+                logger.warning(f"VOLT-AI Free Starter Tier limit reached for '{dev_session}': {recent_calls}/{free_daily_limit}")
+                return JSONResponse(
+                    {
+                        "error": {
+                            "message": (
+                                f"You have reached your {free_daily_limit} free daily requests for the VOLT-AI community model. "
+                                "To continue coding, generate a free API key at the website portal (https://volt-ai-lmgz.onrender.com) "
+                                "or supply your own provider API key via 'volt activate'."
+                            ),
+                            "type": "quota_exceeded",
+                            "code": 429,
+                        }
+                    },
+                    status_code=429,
+                    headers={
+                        "x-volt-tier": "free_starter",
+                        "x-volt-free-remaining": "0",
+                        "x-volt-quota-status": "exceeded",
+                    }
+                )
+            tier_label = "free_starter"
+            free_remaining = max(0, free_daily_limit - recent_calls - 1)
+        else:
+            # Strict BYOK required when free tier is explicitly disabled
+            logger.warning("VOLT-AI request rejected: Missing or invalid user API key (BYOK required).")
+            return JSONResponse(
+                {
+                    "error": {
+                        "message": (
+                            "VOLT-AI operates on a Bring-Your-Own-Key (BYOK) model. "
+                            "Please provide your own LLM provider API key (OpenRouter, DeepSeek, Gemini, or OpenAI) "
+                            "in the 'Authorization: Bearer <your-key>' header or generate a free key via 'volt activate'."
+                        ),
+                        "type": "authentication_required",
+                        "code": 401,
+                        "param": "Authorization",
+                    }
+                },
+                status_code=401,
+                headers={
+                    "WWW-Authenticate": 'Bearer realm="VOLT-AI BYOK"',
+                    "x-volt-byok": "required",
+                },
+            )
 
     # Telemetry and Key Identity tracking for the Data Collection Pipeline
-    dev_session = request.headers.get("x-session-id") or request.headers.get("x-user") or request.headers.get("user") or "anonymous-session"
-    effective_project = project or request.headers.get("x-project") or "default"
-    k_masked = mask_api_key(client_key)
-    k_hash = hash_api_key(client_key)
+    k_masked = mask_api_key(client_key) if not is_missing_or_dummy else "free-tier"
+    k_hash = hash_api_key(client_key) if not is_missing_or_dummy else "anonymous"
 
     provider = "custom"
-    lower_k = client_key.lower()
-    if "sk-or-" in lower_k or "openrouter" in lower_k:
+    lower_k = client_key.lower() if client_key else ""
+    if is_portal_key:
+        provider = "volt-portal"
+    elif "sk-or-" in lower_k or "openrouter" in lower_k:
         provider = "openrouter"
     elif "aiza" in lower_k:
         provider = "gemini"
@@ -363,6 +481,8 @@ async def coordinate_request(
         provider = "deepseek"
     elif "sk-" in lower_k:
         provider = "openai"
+    elif tier_label == "free_starter":
+        provider = "volt-free-starter"
 
     if pool is not None and k_hash != "anonymous":
         try:
@@ -541,6 +661,12 @@ async def coordinate_request(
         except Exception as log_err:
             logger.warning(f"Coordinator logging notice: {log_err}")
 
+    # Record in-memory usage for instant quota evaluation
+    if tier_label == "free_starter":
+        record_in_memory_call(f"free:{dev_session}")
+    elif tier_label == "portal_key":
+        record_in_memory_call(f"portal:{k_hash}")
+
     # Build standard OpenAI response object
     resp_id = "chatcmpl-" + uuid.uuid4().hex[:12]
     created_ts = int(time.time())
@@ -554,9 +680,12 @@ async def coordinate_request(
         "x-observer-specialists": ",".join(specialists),
         "x-volt-latency-ms": str(latency_ms),
         "x-observer-latency-ms": str(latency_ms),
-        "x-volt-byok": "active",
+        "x-volt-tier": tier_label,
+        "x-volt-byok": "active" if tier_label == "byok_unlimited" else "free_tier",
         "x-volt-data-collection": "active",
     }
+    if free_remaining is not None:
+        headers["x-volt-free-remaining"] = str(free_remaining)
 
     if streamed:
         async def stream_generator() -> AsyncGenerator[bytes, None]:

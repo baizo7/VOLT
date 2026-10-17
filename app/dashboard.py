@@ -150,6 +150,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 <!-- ========== TAB NAVIGATION ========== -->
 <nav class="flex flex-wrap gap-1 bg-surface-950 p-1 rounded-xl border border-surface-700/70 text-[11px]">
   <button onclick="switchTab('overview')"   id="tab-overview"   class="tab-active   px-3.5 py-1.5 font-semibold rounded-lg transition-all">📊 Overview</button>
+  <button onclick="switchTab('portal')"     id="tab-portal"     class="tab-inactive px-3.5 py-1.5 font-semibold rounded-lg transition-all text-amber-300 hover:text-amber-200">🔑 Model Portal & API Keys</button>
   <button onclick="switchTab('traces')"     id="tab-traces"     class="tab-inactive px-3.5 py-1.5 font-semibold rounded-lg transition-all">🔍 Trace Explorer</button>
   <button onclick="switchTab('export')"     id="tab-export"     class="tab-inactive px-3.5 py-1.5 font-semibold rounded-lg transition-all" style="display:none">📦 Dataset Export</button>
   <button onclick="switchTab('setup')"      id="tab-setup"      class="tab-inactive px-3.5 py-1.5 font-semibold rounded-lg transition-all">⚡ IDE Setup</button>
@@ -344,6 +345,129 @@ DASHBOARD_HTML = """<!DOCTYPE html>
   </section>
 </div>
 
+<!-- ====================== TAB: MODEL PORTAL & API KEYS ====================== -->
+<div id="panel-portal" class="hidden space-y-4 fade-in">
+  <div class="card p-6 space-y-6 border-amber-500/30 bg-gradient-to-b from-surface-900 via-surface-900 to-indigo-950/20">
+    <div class="flex flex-wrap items-center justify-between gap-4">
+      <div>
+        <div class="flex items-center gap-2">
+          <span class="text-xs font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30">Community Model Gateway</span>
+          <span class="text-xs font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">Free Starter Tier Active (30 req/day)</span>
+        </div>
+        <h2 class="text-xl font-extrabold text-white mt-1.5 flex items-center gap-2">
+          <span>⚡ VOLT-AI Model Portal & API Access</span>
+        </h2>
+        <p class="text-xs text-slate-400 mt-1 max-w-2xl">
+          Generate a free API key to access the <span class="text-amber-400 font-bold">VOLT-AI</span> coordinated model directly from Cursor, VS Code, Python scripts, or terminal CLI. Zero cost to get started.
+        </p>
+      </div>
+      <div class="bg-surface-950/90 px-4 py-2.5 rounded-xl border border-surface-700/80 text-right">
+        <p class="text-[10px] uppercase font-bold text-slate-400">Target Model ID</p>
+        <p class="text-base font-black text-amber-400 font-mono">VOLT-AI <span class="text-xs font-normal text-slate-400">/ volt-ai-1.0</span></p>
+      </div>
+    </div>
+
+    <!-- API Key Generation Card -->
+    <div class="card p-5 bg-surface-950 border-surface-700 space-y-4">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h3 class="text-sm font-bold text-white flex items-center gap-2">
+            <span>🔑 Generate Personal VOLT API Key</span>
+          </h3>
+          <p class="text-[11px] text-slate-400 mt-0.5">Instant key generation — no credit card needed. Comes with 50 free requests per day.</p>
+        </div>
+        <span class="text-[10px] font-semibold text-cyan-400 bg-cyan-950/60 px-2.5 py-1 rounded-full border border-cyan-800/60">⚡ Instant Key Activation</span>
+      </div>
+
+      <div class="flex flex-wrap gap-2.5 items-center">
+        <input type="text" id="portal-dev-name" placeholder="Enter your developer handle (e.g. dev-alex)" class="flex-1 min-w-[240px] bg-surface-900 border border-surface-700 rounded-lg px-3.5 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 placeholder-slate-500">
+        <button onclick="generatePortalKey()" class="px-5 py-2 text-xs font-bold bg-gradient-to-r from-amber-500 via-indigo-600 to-violet-600 hover:from-amber-400 hover:to-indigo-500 text-white rounded-lg transition shadow-md flex items-center gap-2">
+          <span>⚡ Generate Free Key</span>
+        </button>
+      </div>
+
+      <!-- Generated Key Result Box -->
+      <div id="portal-key-result" class="hidden card p-4 border-emerald-500/40 bg-emerald-950/20 space-y-3 fade-in">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
+            <span class="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span> Active VOLT API Key
+          </span>
+          <span class="text-[10px] font-semibold text-emerald-300 bg-surface-900 px-2.5 py-0.5 rounded border border-surface-700">Daily Quota: 50 requests/day</span>
+        </div>
+        <div class="flex items-center gap-2 bg-surface-900 p-2.5 rounded-lg border border-surface-700">
+          <code id="portal-generated-key" class="text-xs font-mono text-emerald-300 flex-1 overflow-x-auto select-all">volt_live_...</code>
+          <button onclick="copyGeneratedKey()" id="portal-copy-btn" class="px-3 py-1 text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white rounded transition copy-btn">Copy</button>
+        </div>
+        <p class="text-[11px] text-slate-400">✅ Key activated! Use it in any OpenAI-compatible tool or the CLI. All prompts & solutions anonymously power the open-source VOLT training dataset.</p>
+      </div>
+    </div>
+
+    <!-- Quick Integration Snippets -->
+    <div class="space-y-3">
+      <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider">Quick Connect Code Snippets</h3>
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-3.5">
+        <!-- Python -->
+        <div class="card p-4 bg-surface-950 border-surface-700 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-slate-200">🐍 Python (OpenAI SDK)</span>
+            <button onclick="copySnippet('portal-code-py')" class="text-[10px] text-indigo-400 hover:text-indigo-300 font-bold">Copy</button>
+          </div>
+          <pre class="bg-surface-900 p-3 rounded-lg text-[11px] font-mono text-slate-300 overflow-x-auto border border-surface-800" id="portal-code-py">from openai import OpenAI
+
+client = OpenAI(
+    base_url="${server}/v1",
+    api_key="<your-volt-key>"
+)
+
+res = client.chat.completions.create(
+    model="VOLT-AI",
+    messages=[{"role": "user", "content": "Write quicksort in python"}]
+)
+print(res.choices[0].message.content)</pre>
+        </div>
+
+        <!-- Terminal Shell -->
+        <div class="card p-4 bg-surface-950 border-surface-700 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-slate-200">🐚 Terminal (PowerShell / Bash)</span>
+            <button onclick="copySnippet('portal-code-sh')" class="text-[10px] text-indigo-400 hover:text-indigo-300 font-bold">Copy</button>
+          </div>
+          <pre class="bg-surface-900 p-3 rounded-lg text-[11px] font-mono text-slate-300 overflow-x-auto border border-surface-800" id="portal-code-sh"># PowerShell:
+$env:OPENAI_BASE_URL="${server}/v1"
+$env:OPENAI_API_KEY="<your-volt-key>"
+
+# Linux / macOS Bash:
+export OPENAI_BASE_URL="${server}/v1"
+export OPENAI_API_KEY="<your-volt-key>"</pre>
+        </div>
+
+        <!-- Cursor / VS Code -->
+        <div class="card p-4 bg-surface-950 border-surface-700 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-slate-200">💻 Cursor / VS Code / Aider</span>
+            <button onclick="copySnippet('portal-code-cursor')" class="text-[10px] text-indigo-400 hover:text-indigo-300 font-bold">Copy</button>
+          </div>
+          <pre class="bg-surface-900 p-3 rounded-lg text-[11px] font-mono text-slate-300 overflow-x-auto border border-surface-800" id="portal-code-cursor">Model Name : VOLT-AI
+Base URL   : ${server}/v1
+API Key    : <your-volt-key></pre>
+        </div>
+
+        <!-- cURL -->
+        <div class="card p-4 bg-surface-950 border-surface-700 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-slate-200">🌐 cURL HTTP</span>
+            <button onclick="copySnippet('portal-code-curl')" class="text-[10px] text-indigo-400 hover:text-indigo-300 font-bold">Copy</button>
+          </div>
+          <pre class="bg-surface-900 p-3 rounded-lg text-[11px] font-mono text-slate-300 overflow-x-auto border border-surface-800" id="portal-code-curl">curl -X POST ${server}/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <your-volt-key>" \
+  -d '{"model":"VOLT-AI","messages":[{"role":"user","content":"Hello from VOLT!"}]}'</pre>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ====================== TAB: IDE SETUP ====================== -->
 <div id="panel-setup" class="hidden fade-in">
   <div class="card p-6 space-y-5">
@@ -489,17 +613,62 @@ function updateUIForRole() {
 }
 
 // ────────── Tabs ──────────
-const TABS = ['overview','traces','export','setup','compare'];
+const TABS = ['overview','portal','traces','export','setup','compare'];
 function switchTab(t) {
   TABS.forEach(id => {
-    document.getElementById('panel-'+id).classList.toggle('hidden', id !== t);
+    const panel = document.getElementById('panel-'+id);
+    if (panel) panel.classList.toggle('hidden', id !== t);
     const btn = document.getElementById('tab-'+id);
-    btn.className = id === t ? 'tab-active px-3.5 py-1.5 font-semibold rounded-lg transition-all' : 'tab-inactive px-3.5 py-1.5 font-semibold rounded-lg transition-all';
-    if (id === 'export' && S.role !== 'admin') btn.style.display = 'none';
+    if (btn) {
+      btn.className = id === t ? 'tab-active px-3.5 py-1.5 font-semibold rounded-lg transition-all' : 'tab-inactive px-3.5 py-1.5 font-semibold rounded-lg transition-all';
+      if (id === 'export' && S.role !== 'admin') btn.style.display = 'none';
+    }
   });
   if (t === 'setup') renderIDECards();
   if (t === 'compare') renderCompare();
   if (t === 'overview') { setTimeout(() => fetchTimeseries(), 100); }
+}
+
+async function generatePortalKey() {
+  const nameInput = document.getElementById('portal-dev-name');
+  const devName = nameInput ? nameInput.value.trim() : '';
+  try {
+    const res = await fetch('/api/keys/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: devName || S.user || 'developer' })
+    });
+    const data = await res.json();
+    if (data.ok && data.api_key) {
+      document.getElementById('portal-key-result').classList.remove('hidden');
+      document.getElementById('portal-generated-key').innerText = data.api_key;
+      updateSnippetsWithKey(data.api_key);
+    }
+  } catch(err) {
+    alert('Key generation error: ' + err);
+  }
+}
+
+function copyGeneratedKey() {
+  const k = document.getElementById('portal-generated-key').innerText;
+  navigator.clipboard.writeText(k);
+  const btn = document.getElementById('portal-copy-btn');
+  btn.innerText = 'Copied!';
+  setTimeout(() => { btn.innerText = 'Copy'; }, 2000);
+}
+
+function copySnippet(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  navigator.clipboard.writeText(el.innerText);
+  alert('Snippet copied to clipboard!');
+}
+
+function updateSnippetsWithKey(k) {
+  ['portal-code-py','portal-code-sh','portal-code-cursor','portal-code-curl'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerText = el.innerText.replace(/<your-volt-key>/g, k);
+  });
 }
 
 // ────────── Fetch Data ──────────

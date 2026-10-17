@@ -390,8 +390,9 @@ async def test_volt_ai_models_listing(async_client):
 
 
 @pytest.mark.asyncio
-async def test_volt_ai_requires_byok_api_key(async_client):
-    """Ensure requests to VOLT-AI without a user API key return 401 Unauthorized with BYOK requirement."""
+async def test_volt_ai_requires_byok_api_key(async_client, monkeypatch):
+    """Ensure requests to VOLT-AI without a user API key return 401 Unauthorized when free tier is disabled."""
+    monkeypatch.setenv("VOLT_FREE_TIER", "0")
     payload = {
         "model": "VOLT-AI",
         "messages": [{"role": "user", "content": "Write quicksort"}],
@@ -407,8 +408,9 @@ async def test_volt_ai_requires_byok_api_key(async_client):
 
 
 @pytest.mark.asyncio
-async def test_volt_ai_byok_dummy_keys_rejected(async_client):
-    """Ensure dummy placeholder keys ('volt-cloud', 'none', short keys) are rejected."""
+async def test_volt_ai_byok_dummy_keys_rejected(async_client, monkeypatch):
+    """Ensure dummy placeholder keys ('volt-cloud', 'none', short keys) are rejected when free tier is disabled."""
+    monkeypatch.setenv("VOLT_FREE_TIER", "0")
     payload = {
         "model": "VOLT-AI",
         "messages": [{"role": "user", "content": "Write quicksort"}],
@@ -422,4 +424,124 @@ async def test_volt_ai_byok_dummy_keys_rejected(async_client):
         )
         assert resp.status_code == 401
         assert resp.headers.get("x-volt-byok") == "required"
+
+
+@pytest.mark.asyncio
+async def test_volt_ai_free_starter_tier_allowed(async_client, monkeypatch):
+    """Ensure requests without an API key are allowed under Free Starter Tier when VOLT_FREE_TIER=1."""
+    monkeypatch.setenv("VOLT_FREE_TIER", "1")
+    monkeypatch.setenv("VOLT_FREE_DAILY_LIMIT", "30")
+
+    mock_client = AsyncMock()
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.json.return_value = {
+        "choices": [{"message": {"content": "def quicksort(arr): return arr"}}],
+        "usage": {"prompt_tokens": 10, "completion_tokens": 10}
+    }
+    mock_client.post.return_value = mock_resp
+    monkeypatch.setattr(main, "client", mock_client)
+
+    payload = {
+        "model": "VOLT-AI",
+        "messages": [{"role": "user", "content": "Write quicksort"}],
+        "stream": False
+    }
+    resp = await async_client.post("/v1/chat/completions", json=payload)
+    assert resp.status_code == 200
+    assert resp.headers.get("x-volt-tier") == "free_starter"
+    assert resp.headers.get("x-volt-free-remaining") is not None
+    assert resp.headers.get("x-volt-data-collection") == "active"
+
+
+@pytest.mark.asyncio
+async def test_volt_ai_free_starter_tier_quota_exceeded(async_client, monkeypatch):
+    """Ensure 429 is returned when free starter tier limit is exceeded."""
+    monkeypatch.setenv("VOLT_FREE_TIER", "1")
+    monkeypatch.setenv("VOLT_FREE_DAILY_LIMIT", "0")
+
+    payload = {
+        "model": "VOLT-AI",
+        "messages": [{"role": "user", "content": "Write quicksort"}],
+        "stream": False
+    }
+    resp = await async_client.post(
+        "/v1/chat/completions",
+        json=payload,
+        headers={"x-session-id": "test-exhausted-session"}
+    )
+    assert resp.status_code == 429
+    data = resp.json()
+    assert "error" in data
+    assert data["error"]["type"] == "quota_exceeded"
+    assert resp.headers.get("x-volt-quota-status") == "exceeded"
+
+
+@pytest.mark.asyncio
+async def test_volt_ai_portal_key_allowed(async_client, monkeypatch):
+    """Ensure requests with portal generated key (volt_live_...) are admitted with portal_key tier."""
+    monkeypatch.setenv("VOLT_PORTAL_KEY_LIMIT", "50")
+
+    mock_client = AsyncMock()
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.json.return_value = {
+        "choices": [{"message": {"content": "def bubble_sort(arr): return arr"}}],
+        "usage": {"prompt_tokens": 12, "completion_tokens": 8}
+    }
+    mock_client.post.return_value = mock_resp
+    monkeypatch.setattr(main, "client", mock_client)
+
+    payload = {
+        "model": "VOLT-AI",
+        "messages": [{"role": "user", "content": "Write bubble sort"}],
+        "stream": False
+    }
+    resp = await async_client.post(
+        "/v1/chat/completions",
+        json=payload,
+        headers={"Authorization": "Bearer volt_live_abcdef1234567890abcdef1234567890"}
+    )
+    assert resp.status_code == 200
+    assert resp.headers.get("x-volt-tier") == "portal_key"
+    assert resp.headers.get("x-volt-free-remaining") is not None
+
+
+@pytest.mark.asyncio
+async def test_volt_ai_portal_key_quota_exceeded(async_client, monkeypatch):
+    """Ensure 429 is returned when portal key daily limit is exceeded."""
+    monkeypatch.setenv("VOLT_PORTAL_KEY_LIMIT", "0")
+
+    payload = {
+        "model": "VOLT-AI",
+        "messages": [{"role": "user", "content": "Write bubble sort"}],
+        "stream": False
+    }
+    resp = await async_client.post(
+        "/v1/chat/completions",
+        json=payload,
+        headers={"Authorization": "Bearer volt_live_limit_exhausted_key_12345"}
+    )
+    assert resp.status_code == 429
+    assert resp.headers.get("x-volt-tier") == "portal_key"
+    assert resp.headers.get("x-volt-quota-status") == "exceeded"
+
+
+@pytest.mark.asyncio
+async def test_generate_portal_api_key_endpoint(async_client):
+    """Ensure POST /api/keys/generate produces valid volt_live keys and integration snippets."""
+    resp = await async_client.post(
+        "/api/keys/generate",
+        json={"name": "Alice Developer", "project": "ai-code-companion"}
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["ok"] is True
+    assert data["api_key"].startswith("volt_live_")
+    assert len(data["api_key"]) > 30
+    assert "instructions" in data
+    assert "python" in data["instructions"]
+    assert "powershell" in data["instructions"]
+    assert "curl" in data["instructions"]
+
 

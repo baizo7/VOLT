@@ -20,15 +20,27 @@
 
 ## 🌟 Overview
 
-VOLT-AI provides next-generation AI coordination, dynamic specialist fallback, and real-time observability for modern software development:
+VOLT-AI provides next-generation AI coordination, dynamic specialist fallback, real-time observability, and a community model portal:
 
+- **Free Starter Tier (Zero Setup Required)**: Anyone can start coding immediately with `VOLT-AI` without an API key (up to 30 free daily requests).
+- **Web Developer Portal & 1-Click API Key Generator**: Visit [volt-ai-lmgz.onrender.com](https://volt-ai-lmgz.onrender.com) to generate your personal `volt_live_...` API key with 50 free requests per day, copy-paste snippets for Python, Cursor, VS Code, and terminal CLI.
+- **Bring-Your-Own-Key (BYOK) for Unlimited Power**: Provide your personal provider key (OpenRouter, DeepSeek, Gemini, or OpenAI) for 100% unlimited requests billed to your provider at zero markup.
 - **Open-Source VOLT-AI Model (`volt-ai-1.0`)**: Open model card and inference schema for code generation, architectural synthesis, and multi-turn refactoring.
-- **Bring-Your-Own-Key (BYOK) Data Flywheel**: Users access the coordinated model by providing their own LLM provider API key (OpenRouter, DeepSeek, Gemini, or OpenAI). Users pay their own provider directly for tokens while their development activities and verified solutions are captured to continuously train and improve future VOLT model releases.
-- **Intelligent Routing**: Seamlessly routes complex coding tasks to the highest-performing models (Claude 3.7, DeepSeek-Coder, Gemini 2.5/3, OpenRouter, and local LLMs) with automatic fallbacks.
+- **Automated Data Collection Flywheel**: All coding activity is scrubbed of credentials and continuously captured into PostgreSQL for fine-tuning future open-source VOLT releases via LoRA and DPO.
 - **Client Tooling (`volt-coder` & `volt`)**: Local terminal CLI for one-shot coding, interactive chat sessions, and personal token usage analytics.
 - **Universal Drop-in Proxy**: OpenAI & Anthropic API compatible proxy supporting Cursor, Aider, OpenCode, VS Code extensions, and native SDKs.
 - **Zero-Leak Secret Redaction**: In-flight redaction of API keys, AWS credentials, GitHub tokens, and private keys before persistence.
 - **Live Observability Dashboard**: Real-time glassmorphism analytics dashboard tracking tokens, latency, cost, and test pass rates.
+
+---
+
+## 🔑 3 Ways to Access VOLT-AI
+
+| Tier | API Key Required? | Quota / Limits | Best For |
+| :--- | :--- | :--- | :--- |
+| **1. Free Starter** | ❌ None | **30 free requests / day** | Instant testing, quick CLI queries, casual terminal scripting |
+| **2. Portal Developer Key** | ⚡ `volt_live_...` (1-Click Generate) | **50 free requests / day** | Personal developer projects, VS Code / Cursor plugins, scripts |
+| **3. BYOK (Bring Your Own Key)** | 🔑 OpenRouter, DeepSeek, Gemini, OpenAI | ♾️ **Unlimited** | Power users, large codebases, continuous development |
 
 ---
 
@@ -115,19 +127,27 @@ source .venv/bin/activate
 pip install -e .
 ```
 
-### 2. Configure Your Local Client with Your API Key
+### 2. Configure Your Client (Free Tier or BYOK)
 
-Run the interactive setup to configure your terminal and save your provider key:
-
+#### Option A: Zero Configuration (Instant Free Starter Tier)
+You do not need an API key to test VOLT-AI! Simply run:
 ```bash
-# Point to the official central cloud server (default)
-volt activate --server https://volt-ai-lmgz.onrender.com
-
-# Or point to a custom self-hosted endpoint
-volt activate --server http://localhost:8787
+volt-coder "Write a binary search algorithm in Python"
 ```
+Requests will automatically connect to the free community starter tier (up to 30 requests/day).
 
-During setup, enter your personal provider API key:
+#### Option B: Generate a Free Developer Portal Key (50 requests/day)
+1. Open the [VOLT-AI Portal](https://volt-ai-lmgz.onrender.com).
+2. Switch to the **🔑 Model Portal & API Keys** tab.
+3. Click **⚡ Generate My Free VOLT API Key**.
+4. Run `volt activate` and paste your `volt_live_...` key.
+
+#### Option C: Bring Your Own Provider Key (Unlimited Usage)
+For unlimited requests, run:
+```bash
+volt activate --server https://volt-ai-lmgz.onrender.com
+```
+And provide your personal provider API key:
 - **OpenRouter** ([openrouter.ai/keys](https://openrouter.ai/keys)) *(Recommended for access to all models)*
 - **DeepSeek** ([platform.deepseek.com](https://platform.deepseek.com))
 - **Google Gemini** ([aistudio.google.com](https://aistudio.google.com))
