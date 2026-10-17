@@ -1,11 +1,13 @@
 # ⚡ VOLT-AI
 
-**Intelligent Multi-Model AI Coordination, Routing & Observability Engine**
+**Autonomous Multi-Model AI Coordination, Routing & Observability Engine**
 
+[![PyPI Version](https://img.shields.io/badge/pypi-v1.0.0-blue.svg)](https://pypi.org/project/volt-ai/)
 [![Author: Baizo](https://img.shields.io/badge/Author-Baizo%20%28S%20Sanjai%29-blue.svg)](https://github.com/baizo7)
 [![Model License: Apache 2.0](https://img.shields.io/badge/Model%20License-Apache%202.0%20%28Open%20Source%29-green.svg)](LICENSE)
 [![Platform License: Proprietary](https://img.shields.io/badge/Platform%20License-Proprietary%20%2F%20Source--Available-red.svg)](LICENSE)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/)
+[![Tests](https://img.shields.io/badge/tests-179%20passed%20%28100%25%29-brightgreen.svg)]()
 [![Cloud Endpoint](https://img.shields.io/badge/Render-Live%20Endpoint-46E3B7.svg)](https://volt-ai-lmgz.onrender.com)
 [![BYOK Architecture](https://img.shields.io/badge/Access-Bring--Your--Own--Key%20%28BYOK%29-orange.svg)]()
 
@@ -20,27 +22,101 @@
 
 ## 🌟 Overview
 
-VOLT-AI provides next-generation AI coordination, dynamic specialist fallback, real-time observability, and a community model portal:
+VOLT-AI provides autonomous multi-model coordination, dynamic specialist fallback, real-time observability, and a community developer portal:
 
-- **Free Starter Tier (Zero Setup Required)**: Anyone can start coding immediately with `VOLT-AI` without an API key (up to 30 free daily requests).
-- **Web Developer Portal & 1-Click API Key Generator**: Visit [volt-ai-lmgz.onrender.com](https://volt-ai-lmgz.onrender.com) to generate your personal `volt_live_...` API key with 50 free requests per day, copy-paste snippets for Python, Cursor, VS Code, and terminal CLI.
+- **1-Command Global Install**: `pip install volt-ai` gives immediate terminal access with zero heavy dependencies.
+- **Free Community Tier (Zero Setup Required)**: Anyone can start coding immediately with `VOLT-AI` without an API key (up to 30 free daily requests).
+- **Google Authentication & Web Developer Portal**: Visit [volt-ai-lmgz.onrender.com/login](https://volt-ai-lmgz.onrender.com/login) to sign in with Google or instant developer demo, manage your profile, and generate a personal `volt_live_...` API key with 50 free requests per day.
 - **Bring-Your-Own-Key (BYOK) for Unlimited Power**: Provide your personal provider key (OpenRouter, DeepSeek, Gemini, or OpenAI) for 100% unlimited requests billed to your provider at zero markup.
-- **Open-Source VOLT-AI Model (`volt-ai-1.0`)**: Open model card and inference schema for code generation, architectural synthesis, and multi-turn refactoring.
-- **Automated Data Collection Flywheel**: All coding activity is scrubbed of credentials and continuously captured into PostgreSQL for fine-tuning future open-source VOLT releases via LoRA and DPO.
-- **Client Tooling (`volt-coder` & `volt`)**: Local terminal CLI for one-shot coding, interactive chat sessions, and personal token usage analytics.
+- **Multi-Model Specialist Roster**: Automatically routes requests across 5 dedicated open-weight specialists:
+  - ⚡ **Fast Coder**: Quick code generation and syntax repair (`Qwen2.5-Coder-1.5B` / `32B`).
+  - 🧠 **Deep Reasoner**: Step-by-step chain-of-thought, architectural planning, and algorithm design (`DeepSeek-R1`).
+  - 🏗️ **Heavy Coder**: Large-scale refactoring, systems engineering, and multi-file codebases (`Qwen2.5-Coder-32B`).
+  - 📐 **Math Specialist**: Numerical proofs, matrix operations, and mathematical reasoning (`Qwen2.5-Math-7B`).
+  - 👁️ **Vision Specialist**: UI mockup analysis, screenshot-to-code, and visual inspection (`Qwen2-VL-7B`).
+- **Two-Pass Reasoning Pipeline**: When complex architectural tasks are detected, the reasoning specialist designs a verified blueprint first, which the coding specialist then turns into modular, production-ready code.
+- **Burst Rate Limiting**: Built-in SlowAPI protection with tier-aware quotas (10 req/min for unauthenticated community IPs; 30 req/min for portal keys; 120 req/min for BYOK) and Cloudflare `CF-Connecting-IP` support.
 - **Universal Drop-in Proxy**: OpenAI & Anthropic API compatible proxy supporting Cursor, Aider, OpenCode, VS Code extensions, and native SDKs.
-- **Zero-Leak Secret Redaction**: In-flight redaction of API keys, AWS credentials, GitHub tokens, and private keys before persistence.
+- **Zero-Leak Secret Redaction**: In-flight regex redaction strips API keys, AWS credentials, GitHub tokens, and private keys before PostgreSQL persistence.
 - **Live Observability Dashboard**: Real-time glassmorphism analytics dashboard tracking tokens, latency, cost, and test pass rates.
 
 ---
 
 ## 🔑 3 Ways to Access VOLT-AI
 
-| Tier | API Key Required? | Quota / Limits | Best For |
-| :--- | :--- | :--- | :--- |
-| **1. Free Starter** | ❌ None | **30 free requests / day** | Instant testing, quick CLI queries, casual terminal scripting |
-| **2. Portal Developer Key** | ⚡ `volt_live_...` (1-Click Generate) | **50 free requests / day** | Personal developer projects, VS Code / Cursor plugins, scripts |
-| **3. BYOK (Bring Your Own Key)** | 🔑 OpenRouter, DeepSeek, Gemini, OpenAI | ♾️ **Unlimited** | Power users, large codebases, continuous development |
+| Tier | API Key Required? | Quota / Limits | Rate Limit | Best For |
+| :--- | :--- | :--- | :--- | :--- |
+| **1. Free Starter** | ❌ None | **30 free requests / day** | 10 req / min per IP | Instant testing, quick CLI queries, casual terminal scripting |
+| **2. Portal Developer Key** | ⚡ `volt_live_...` (1-Click Generate) | **50 free requests / day** | 30 req / min | Personal developer projects, VS Code / Cursor plugins, scripts |
+| **3. BYOK (Bring Your Own Key)** | 🔑 OpenRouter, DeepSeek, Gemini, OpenAI | ♾️ **Unlimited** | 120 req / min | Power users, large codebases, continuous development |
+
+---
+
+## 🚀 Quickstart: Install via PyPI
+
+Install the lightweight, zero-dependency CLI on any system (Windows, macOS, Linux):
+
+```bash
+pip install volt-ai
+```
+
+### 1. Test Connectivity
+```bash
+volt test
+```
+*Expected output: `[+] Success! Response from VOLT-AI: 'PONG'`*
+
+### 2. Generate Code Immediately (Free Community Tier)
+```bash
+# Generate single-pass code
+volt code "Write a fast thread-safe LRU cache in Python"
+
+# Auto-write generated code blocks directly to files
+volt code -w "Create a modern responsive Tailwind landing page with a hero and pricing grid"
+```
+
+### 3. Inspect Specialist Catalog
+```bash
+volt models
+```
+
+---
+
+## 🛠️ Developer Setup & Terminal Activation
+
+Configure your terminal to route through the central VOLT-AI server or attach your personal provider key for unlimited requests:
+
+### Activate VOLT-AI
+```bash
+volt activate
+```
+This interactive prompt configures:
+1. **Central Server URL** (default: `https://volt-ai-lmgz.onrender.com`)
+2. **Developer Username / Session ID**
+3. **Default Project Name**
+4. **Provider API Key (Optional)**: OpenRouter, DeepSeek, Google Gemini, or OpenAI key for unlimited BYOK quota.
+
+Configuration is saved locally to `~/.volt-ai/config.json`.
+
+---
+
+## 💻 CLI Commands & Usage
+
+The `volt` CLI provides comprehensive terminal commands:
+
+| Command | Description | Example |
+| :--- | :--- | :--- |
+| `volt activate` | Configure server URL, session ID, and personal provider key | `volt activate --user sanjai` |
+| `volt code [prompt]` | Generate code or answer technical questions | `volt code "Build a FastAPI rate limiter"` |
+| `volt code -f [file]` | Attach file context to the prompt | `volt code -f app/security.py "Find security flaws"` |
+| `volt code -i [image]`| Attach UI mockup for visual inspection (Qwen2-VL) | `volt code -i mockup.png "Generate HTML/CSS"` |
+| `volt code -w` / `-a` | Auto-extract and write code files to disk | `volt code -w "Create script.py to parse logs"` |
+| `volt chat` | Interactive multi-turn terminal chat session | `volt chat` (Supports `/write`, `/apply`, `/models`, `/clear`) |
+| `volt models` | View specialist models, licenses, and pipeline tracks | `volt models` |
+| `volt test` | Send a ping health check through the proxy | `volt test` |
+| `volt usage` | Inspect personal token consumption and request stats | `volt usage` |
+| `volt dashboard` | Open the real-time glassmorphism web dashboard | `volt dashboard` |
+| `volt env` | Print shell export statements for `OPENAI_BASE_URL` | `volt env --shell powershell` |
 
 ---
 
@@ -54,22 +130,24 @@ VOLT-AI connects model access directly with an automated data collection and fin
 │   (Terminal CLI, Cursor, etc.)  │
 └────────────────┬────────────────┘
                  │
-                 │ 1. Supplies THEIR OWN provider API key (OpenRouter, DeepSeek, Gemini, OpenAI)
+                 │ 1. Supplies personal provider API key or uses free community tier
                  │    via 'volt activate' or 'Authorization: Bearer <your-key>'
                  ▼
 ┌────────────────────────────────────────────────────────────────────────┐
 │                        ⚡ VOLT-AI Engine                               │
 │                                                                        │
-│ 2. BYOK Gatekeeper: Verifies the caller provided an active key.       │
-│    (Rejects unauthorized requests with 401).                           │
+│ 2. Rate Limiting & Tier Gatekeeper: Enforces burst quotas.              │
+│    (10 req/min for IP, 30 req/min for portal, 120 req/min for BYOK).   │
 │                                                                        │
-│ 3. Execution: Dispatches request to provider using THE USER'S KEY.     │
-│    (The provider bills the user's account — zero cost to host).        │
+│ 3. Intent Analysis: Routes request to optimal specialists:             │
+│    • 'fast_coding': Qwen2.5-Coder                                      │
+│    • 'two_pass_reasoning': DeepSeek-R1 (Plan) -> Qwen-Coder (Code)     │
+│    • 'vision': Qwen2-VL (Screenshot / UI Analysis)                     │
 │                                                                        │
 │ 4. Zero-Leak Redaction: Strips API keys, passwords, and tokens.        │
 │                                                                        │
-│ 5. Data Collection: Records prompts, generated code, latency, and     │
-│    session metrics to PostgreSQL (llm_calls table).                    │
+│ 5. Data Collection: Records scrubbed prompts, generated code, latency, │
+│    and session metrics to PostgreSQL (llm_calls table).                │
 └────────────────┬───────────────────────────────────────────────────────┘
                  │
                  ▼
@@ -84,113 +162,6 @@ VOLT-AI connects model access directly with an automated data collection and fin
 
 ---
 
-## 🤖 The VOLT-AI Model (`volt-ai-1.0`)
-
-The **VOLT-AI Model** is released under the **Apache 2.0 Open-Source License**.
-
-### Model Profile
-- **Model ID**: `VOLT-AI` / `volt-ai-1.0`
-- **Architecture**: Multi-Model Coordinated Specialist Mixture
-- **Specializations**: Code synthesis, test-driven repair, system architecture, rapid debugging
-- **Access Model**: Bring-Your-Own-Key (BYOK)
-- **Context Routing**:
-  - `code` track: Specialized code generation and bug fixes
-  - `general` track: Multi-turn architectural explanation and reasoning
-  - `fast` track: Low-latency autocompletions and edits
-  - `creative` track: Novel ideation and documentation
-
----
-
-## 🛠️ Local Setup Configuration (For Developers & Teams)
-
-You can set up and run the VOLT-AI client locally on your workstation to interact with the VOLT-AI cloud server or your self-hosted instances.
-
-### 1. Clone & Install Client Dependencies
-
-Clone the repository and install the client package locally:
-
-```bash
-# Clone the repository
-git clone https://github.com/baizo7/VOLT.git
-cd VOLT
-
-# Set up a Python virtual environment (Python 3.9+)
-python -m venv .venv
-
-# Activate the virtual environment
-# On Linux/macOS:
-source .venv/bin/activate
-# On Windows (PowerShell):
-.venv\Scripts\Activate.ps1
-
-# Install local client package in editable mode
-pip install -e .
-```
-
-### 2. Configure Your Client (Free Tier or BYOK)
-
-#### Option A: Zero Configuration (Instant Free Starter Tier)
-You do not need an API key to test VOLT-AI! Simply run:
-```bash
-volt-coder "Write a binary search algorithm in Python"
-```
-Requests will automatically connect to the free community starter tier (up to 30 requests/day).
-
-#### Option B: Generate a Free Developer Portal Key (50 requests/day)
-1. Open the [VOLT-AI Portal](https://volt-ai-lmgz.onrender.com).
-2. Switch to the **🔑 Model Portal & API Keys** tab.
-3. Click **⚡ Generate My Free VOLT API Key**.
-4. Run `volt activate` and paste your `volt_live_...` key.
-
-#### Option C: Bring Your Own Provider Key (Unlimited Usage)
-For unlimited requests, run:
-```bash
-volt activate --server https://volt-ai-lmgz.onrender.com
-```
-And provide your personal provider API key:
-- **OpenRouter** ([openrouter.ai/keys](https://openrouter.ai/keys)) *(Recommended for access to all models)*
-- **DeepSeek** ([platform.deepseek.com](https://platform.deepseek.com))
-- **Google Gemini** ([aistudio.google.com](https://aistudio.google.com))
-- **OpenAI** ([platform.openai.com](https://platform.openai.com))
-
-This saves your local configuration to `~/.volt-ai/config.json`.
-
----
-
-## 💻 Local CLI Usage (`volt-coder` & `volt`)
-
-Once installed, use the local commands to generate code, chat, and inspect routing:
-
-### One-Shot Code Generation
-```bash
-# Basic prompt
-volt-coder "Write a fast thread-safe LRU cache in Python"
-
-# Include existing files in context
-volt-coder code -f app/security.py "Review this file for security vulnerabilities"
-```
-
-### Interactive Multi-Turn Terminal Chat
-```bash
-volt-coder chat
-```
-
-### Check Available Specialists & Models
-```bash
-volt-coder models
-```
-
-### Personal Usage Analytics
-```bash
-# View personal token consumption and latency
-volt usage
-
-# Open the real-time web dashboard
-volt dashboard
-```
-
----
-
 ## 🔌 IDE & Tool Integration
 
 Route your existing developer tools and IDEs through VOLT-AI:
@@ -201,14 +172,14 @@ Add the following configuration to your terminal profile or IDE settings:
 #### Windows PowerShell (`$PROFILE`):
 ```powershell
 $env:OPENAI_BASE_URL = "https://volt-ai-lmgz.onrender.com/v1"
-$env:OPENAI_API_KEY  = "your-provider-api-key"   # e.g. OpenRouter, DeepSeek, or OpenAI key
+$env:OPENAI_API_KEY  = "your-provider-api-key"   # e.g. OpenRouter, DeepSeek, or Gemini key
 $env:X_SESSION_ID    = $env:USERNAME
 ```
 
 #### Linux / macOS (`~/.bashrc` or `~/.zshrc`):
 ```bash
 export OPENAI_BASE_URL="https://volt-ai-lmgz.onrender.com/v1"
-export OPENAI_API_KEY="your-provider-api-key"    # e.g. OpenRouter, DeepSeek, or OpenAI key
+export OPENAI_API_KEY="your-provider-api-key"    # e.g. OpenRouter, DeepSeek, or Gemini key
 export X_SESSION_ID="$USER"
 ```
 
@@ -235,12 +206,12 @@ Specify either:
 
 ---
 
-## 🧪 Running Client Tests
+## 🧪 Running Tests
 
-Verify your local client installation:
+Run the full automated test suite:
 
 ```bash
-# Run unit & API test suite (161 tests passing)
+# Run unit & API test suite (179 tests passing, 0 warnings)
 pytest -m "not integration"
 ```
 
