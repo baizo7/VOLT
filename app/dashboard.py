@@ -66,6 +66,20 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       </div>
     </div>
     <div class="flex items-center gap-2">
+      <!-- Google User Profile Pill -->
+      <div id="header-user-pill" class="hidden items-center gap-2 px-2.5 py-1 rounded-xl bg-surface-800 border border-surface-700">
+        <img id="header-user-avatar" src="" class="h-6 w-6 rounded-full border border-indigo-400 hidden" alt="Avatar">
+        <span id="header-user-avatar-initials" class="h-6 w-6 rounded-full bg-indigo-600/30 text-indigo-300 border border-indigo-500/40 flex items-center justify-center text-[10px] font-bold">U</span>
+        <div class="text-left hidden sm:block">
+          <p id="header-user-name" class="text-xs font-bold text-white leading-tight">Developer</p>
+          <p id="header-user-email" class="text-[9px] text-slate-400 leading-tight">user@volt.ai</p>
+        </div>
+        <button onclick="handleDashboardSignOut()" class="text-[10px] text-rose-400 hover:text-rose-300 ml-1 font-semibold hover:underline">Sign Out</button>
+      </div>
+      <a id="header-login-btn" href="/login" class="px-2.5 py-1.5 text-[11px] font-bold bg-gradient-to-r from-amber-500 to-indigo-600 hover:from-amber-400 hover:to-indigo-500 text-white rounded-lg shadow-sm transition flex items-center gap-1.5">
+        <span>Google Sign In</span>
+      </a>
+
       <span id="health-badge" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-950/60 text-emerald-400 border border-emerald-800/50">
         <span class="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse"></span>Connecting
       </span>
@@ -172,6 +186,20 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     <div class="overflow-x-auto"><table class="w-full text-left text-xs text-slate-300"><thead class="bg-surface-950/70 text-[10px] text-slate-500 border-b border-surface-700 uppercase">
       <tr><th class="py-2 px-3.5">Developer</th><th class="py-2 px-3.5">Project</th><th class="py-2 px-3.5">API Key</th><th class="py-2 px-3.5">Provider</th><th class="py-2 px-3.5">Models</th><th class="py-2 px-3.5">Calls</th><th class="py-2 px-3.5">Tokens</th><th class="py-2 px-3.5">Last Active</th><th class="py-2 px-3.5"></th></tr>
     </thead><tbody id="developers-body" class="divide-y divide-surface-700"><tr><td colspan="9" class="py-4 text-center text-slate-600 text-xs">Loading...</td></tr></tbody></table></div>
+  </section>
+
+  <!-- ADMIN: Registered Google Users & Accounts -->
+  <section id="admin-users-section" class="hidden card overflow-hidden border border-indigo-900/40">
+    <div class="px-4 py-2.5 border-b border-surface-700 flex flex-wrap justify-between items-center gap-2 bg-surface-950/50">
+      <div>
+        <h2 class="text-xs font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-1.5">👥 Registered Google Accounts (Database)</h2>
+        <p class="text-[10px] text-slate-500 mt-0.5">User accounts authenticated via Google OAuth and saved in PostgreSQL</p>
+      </div>
+      <span id="registered-users-count" class="text-[10px] px-2 py-0.5 rounded-full bg-indigo-950/60 text-indigo-300 border border-indigo-800/50 font-bold">0 users</span>
+    </div>
+    <div class="overflow-x-auto"><table class="w-full text-left text-xs text-slate-300"><thead class="bg-surface-950/70 text-[10px] text-slate-500 border-b border-surface-700 uppercase">
+      <tr><th class="py-2 px-3.5">User Profile</th><th class="py-2 px-3.5">Google Email</th><th class="py-2 px-3.5">Role</th><th class="py-2 px-3.5">Provider</th><th class="py-2 px-3.5">First Joined</th><th class="py-2 px-3.5">Last Login</th><th class="py-2 px-3.5">Traces</th></tr>
+    </thead><tbody id="registered-users-body" class="divide-y divide-surface-700"><tr><td colspan="7" class="py-4 text-center text-slate-600 text-xs">Loading registered accounts...</td></tr></tbody></table></div>
   </section>
 
   <!-- Sleek Compact Analytics Widget with Graph Tabs -->
@@ -566,6 +594,27 @@ function fmtCost(v) { return v < 0.01 ? '<$0.01' : '$' + v.toFixed(2); }
 
 // ────────── Init ──────────
 async function initAuth() {
+  // 1. Check if user is authenticated via Google / web session
+  try {
+    const meRes = await fetch('/api/auth/me');
+    if (meRes.ok) {
+      const meData = await meRes.json();
+      if (meData.ok && meData.user) {
+        S.googleUser = meData.user;
+        S.user = meData.user.email;
+        if (meData.user.role === 'admin') {
+          S.role = 'admin';
+        } else {
+          S.role = 'dev';
+        }
+        renderUserHeader();
+        updateUIForRole();
+        return;
+      }
+    }
+  } catch(e) {}
+
+  // 2. Check if admin token is stored
   if (S.adminToken) {
     try {
       const r = await fetch('/admin/verify', {
@@ -580,35 +629,95 @@ async function initAuth() {
         }
       }
     } catch(e) {}
-    // If validation fails, wipe invalid token
     S.adminToken = '';
     localStorage.removeItem('ao_admin_token');
   }
-  if (S.user) S.role = 'dev';
-  else { S.role = 'dev'; S.user = 'dev'; }
+
+  // 3. Fallback to localStorage user profile
+  const storedUser = localStorage.getItem('ao_user');
+  const storedName = localStorage.getItem('ao_user_name');
+  const storedPic = localStorage.getItem('ao_user_pic');
+  if (storedUser) {
+    S.googleUser = { email: storedUser, name: storedName || storedUser.split('@')[0], picture: storedPic };
+    S.user = storedUser;
+    S.role = localStorage.getItem('ao_role') === 'admin' ? 'admin' : 'dev';
+    renderUserHeader();
+  } else if (S.user) {
+    S.role = 'dev';
+  } else {
+    S.role = 'dev';
+    S.user = 'dev';
+  }
   updateUIForRole();
 }
+
+function renderUserHeader() {
+  const pill = document.getElementById('header-user-pill');
+  const loginBtn = document.getElementById('header-login-btn');
+  const nameEl = document.getElementById('header-user-name');
+  const emailEl = document.getElementById('header-user-email');
+  const avatarImg = document.getElementById('header-user-avatar');
+  const avatarInitials = document.getElementById('header-user-avatar-initials');
+
+  if (S.googleUser && S.googleUser.email) {
+    if (pill) { pill.classList.remove('hidden'); pill.classList.add('flex'); }
+    if (loginBtn) loginBtn.classList.add('hidden');
+    if (nameEl) nameEl.textContent = S.googleUser.name || S.googleUser.email.split('@')[0];
+    if (emailEl) emailEl.textContent = S.googleUser.email;
+    if (S.googleUser.picture && avatarImg) {
+      avatarImg.src = S.googleUser.picture;
+      avatarImg.classList.remove('hidden');
+      if (avatarInitials) avatarInitials.classList.add('hidden');
+    } else if (avatarInitials) {
+      avatarInitials.textContent = (S.googleUser.name || S.googleUser.email)[0].toUpperCase();
+      avatarInitials.classList.remove('hidden');
+      if (avatarImg) avatarImg.classList.add('hidden');
+    }
+  } else {
+    if (pill) { pill.classList.add('hidden'); pill.classList.remove('flex'); }
+    if (loginBtn) loginBtn.classList.remove('hidden');
+  }
+}
+
+async function handleDashboardSignOut() {
+  try {
+    await fetch('/api/auth/logout', { method: 'POST' });
+  } catch(e) {}
+  localStorage.removeItem('ao_session_token');
+  localStorage.removeItem('ao_user');
+  localStorage.removeItem('ao_user_name');
+  localStorage.removeItem('ao_user_pic');
+  localStorage.removeItem('ao_role');
+  window.location.href = '/login';
+}
+
 function updateUIForRole() {
   const badge = document.getElementById('role-badge');
   const banner = document.getElementById('developer-banner');
   const adminSec = document.getElementById('admin-developers-section');
+  const adminUsersSec = document.getElementById('admin-users-section');
   const exportTab = document.getElementById('tab-export');
   if (S.role === 'admin') {
     badge.className = "px-2.5 py-0.5 text-[10px] font-bold rounded-full bg-violet-950/60 text-violet-300 border border-violet-800/50 flex items-center gap-1";
     badge.textContent = "👑 Admin (Global View)";
     banner.classList.add('hidden');
     adminSec.classList.remove('hidden');
+    if (adminUsersSec) adminUsersSec.classList.remove('hidden');
     exportTab.style.display = '';
   } else {
     badge.className = "px-2.5 py-0.5 text-[10px] font-bold rounded-full bg-cyan-950/60 text-cyan-300 border border-cyan-800/50 flex items-center gap-1";
-    badge.innerHTML = "👤 Developer: " + S.user + " <span class='text-[9px] text-cyan-400 font-normal'>(Private View)</span>";
+    const displayName = (S.googleUser && S.googleUser.name) ? S.googleUser.name : S.user;
+    badge.innerHTML = "👤 " + displayName + " <span class='text-[9px] text-cyan-400 font-normal'>(" + S.user + ")</span>";
     banner.classList.remove('hidden');
     adminSec.classList.add('hidden');
+    if (adminUsersSec) adminUsersSec.classList.add('hidden');
     exportTab.style.display = 'none';
     if (document.getElementById('panel-export') && !document.getElementById('panel-export').classList.contains('hidden')) {
       switchTab('overview');
     }
-    document.getElementById('banner-user-name').textContent = S.user;
+    document.getElementById('banner-user-name').textContent = displayName;
+    const portalName = document.getElementById('portal-dev-name');
+    if (portalName && !portalName.value) portalName.value = displayName;
   }
 }
 
@@ -703,6 +812,7 @@ async function fetchData() {
       if (S.filterUser) { sq = '?session_id='+encodeURIComponent(S.filterUser); tq = '?session_id='+encodeURIComponent(S.filterUser); document.getElementById('active-filter').textContent = '✕ Filter: '+S.filterUser; document.getElementById('active-filter').onclick = () => { S.filterUser=null; fetchData(); }; }
       else { document.getElementById('active-filter').textContent=''; }
       fetchAdminDevelopers(h);
+      fetchAdminUsers(h);
     } else {
       sq = '?session_id='+encodeURIComponent(S.user);
       tq = '?session_id='+encodeURIComponent(S.user);
@@ -729,6 +839,16 @@ async function fetchData() {
 
 async function fetchAdminDevelopers(h) {
   try { const r = await fetch('/admin/connected-users',{headers:h}); if (r.ok) { const d = await r.json(); renderDevelopers(d.users||[]); } } catch(e) {}
+}
+
+async function fetchAdminUsers(h) {
+  try {
+    const r = await fetch('/api/users', { headers: h });
+    if (r.ok) {
+      const d = await r.json();
+      renderRegisteredUsers(d.users || []);
+    }
+  } catch(e) {}
 }
 async function fetchUserProfile(u) {
   try { const r = await fetch('/user/profile?user='+encodeURIComponent(u), {headers:authHeaders()}); if (r.ok) { const d = await r.json(); const p=d.profile||{}; document.getElementById('banner-masked-key').textContent=p.key_masked||'—'; document.getElementById('banner-provider').textContent=(p.provider||'—').toUpperCase(); } } catch(e) {}
@@ -766,6 +886,45 @@ function renderDevelopers(devs) {
     <td class="py-2.5 px-4 text-[11px] text-slate-500">${((d.total_input_tokens||0)+(d.total_output_tokens||0)).toLocaleString()}</td>
     <td class="py-2.5 px-4 text-[11px] text-slate-500">${d.last_seen?new Date(d.last_seen).toLocaleString():'-'}</td>
     <td class="py-2.5 px-4"><button onclick="event.stopPropagation();S.filterUser='${d.session_id}';fetchData()" class="px-2 py-1 bg-surface-800 hover:bg-surface-700 text-indigo-300 rounded text-[10px] font-bold border border-surface-700 transition">Inspect</button></td>`;
+    tb.appendChild(tr);
+  });
+}
+
+// ────────── Render: Registered Google Users ──────────
+function renderRegisteredUsers(users) {
+  const tb = document.getElementById('registered-users-body');
+  if (!tb) return;
+  const countEl = document.getElementById('registered-users-count');
+  if (countEl) countEl.textContent = users.length + ' user' + (users.length === 1 ? '' : 's');
+  if (!users.length) {
+    tb.innerHTML = '<tr><td colspan="7" class="py-6 text-center text-slate-600 text-xs">No registered accounts in database yet.</td></tr>';
+    return;
+  }
+  tb.innerHTML = '';
+  users.forEach(u => {
+    const tr = document.createElement('tr');
+    tr.className = 'hover:bg-surface-800/40 transition';
+    const roleBadge = u.role === 'admin'
+      ? '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-violet-950/70 text-violet-300 border border-violet-800">Admin</span>'
+      : '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-950/70 text-cyan-300 border border-cyan-800">Developer</span>';
+    const picHtml = u.picture
+      ? `<img src="${u.picture}" class="h-6 w-6 rounded-full border border-indigo-400" alt="avatar">`
+      : `<span class="h-6 w-6 rounded-full bg-indigo-600/30 text-indigo-300 border border-indigo-500/40 flex items-center justify-center text-[10px] font-bold">${(u.name || u.email || 'U')[0].toUpperCase()}</span>`;
+    tr.innerHTML = `
+      <td class="py-2.5 px-3.5 font-semibold text-white text-xs flex items-center gap-2">
+        ${picHtml}
+        <div>
+          <p class="font-bold text-white text-xs">${u.name || 'Anonymous'}</p>
+          <p class="text-[10px] text-slate-500 mono">${u.google_id || u.id}</p>
+        </div>
+      </td>
+      <td class="py-2.5 px-3.5 text-xs text-indigo-300 mono font-semibold">${u.email}</td>
+      <td class="py-2.5 px-3.5">${roleBadge}</td>
+      <td class="py-2.5 px-3.5 text-[11px] uppercase font-semibold text-slate-400">${u.provider || 'google'}</td>
+      <td class="py-2.5 px-3.5 text-[11px] text-slate-500">${u.created_at ? new Date(u.created_at).toLocaleDateString() : '—'}</td>
+      <td class="py-2.5 px-3.5 text-[11px] text-slate-400">${u.last_login_at ? new Date(u.last_login_at).toLocaleString() : '—'}</td>
+      <td class="py-2.5 px-3.5 font-bold text-slate-200 text-xs">${(u.call_count || 0).toLocaleString()}</td>
+    `;
     tb.appendChild(tr);
   });
 }

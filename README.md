@@ -228,6 +228,7 @@ Specify either:
 ## 📊 Live Observability & Cloud Service
 
 - **Central Server**: `https://volt-ai-lmgz.onrender.com`
+- **Google Sign-In & Login Portal**: `https://volt-ai-lmgz.onrender.com/login`
 - **Interactive Dashboard**: `https://volt-ai-lmgz.onrender.com/dashboard`
 - **Health Check**: `https://volt-ai-lmgz.onrender.com/health`
 - **API Models Catalog**: `https://volt-ai-lmgz.onrender.com/v1/models`

@@ -59,13 +59,50 @@ def scrub_record(rec: dict) -> dict:
     return rec
 
 
+def extract_session_token(request: Request) -> Optional[str]:
+    """Extract authenticated user session token from cookie, header, or query parameters."""
+    cookie_token = request.cookies.get("volt_session")
+    if cookie_token and cookie_token.startswith("volt_sess_"):
+        return cookie_token
+
+    auth_header = request.headers.get("authorization", "").strip()
+    if auth_header:
+        parts = auth_header.split(None, 1)
+        token_candidate = parts[1] if (len(parts) == 2 and parts[0].lower() == "bearer") else auth_header
+        if token_candidate.startswith("volt_sess_"):
+            return token_candidate
+
+    for h in ("x-session-token", "x-volt-session", "x-user-token"):
+        val = request.headers.get(h, "").strip()
+        if val.startswith("volt_sess_"):
+            return val
+
+    for q in ("session_token", "volt_session"):
+        val = request.query_params.get(q, "").strip()
+        if val.startswith("volt_sess_"):
+            return val
+
+    return None
+
+
 def check_auth(request: Request) -> bool:
     """
     Verify shared-token authentication using constant-time comparison.
     If OBSERVER_AUTH_TOKEN is unset, verifies whether REQUIRE_AUTH is strictly enforced.
+    Also honors active user sessions from Google Login.
     """
     token = os.environ.get("OBSERVER_AUTH_TOKEN") or os.environ.get("OBSERVER_TOKEN")
     require_auth = os.environ.get("REQUIRE_AUTH", "").lower() in ("true", "1")
+
+    # Check for authenticated user session from Google Login
+    sess_token = extract_session_token(request)
+    if sess_token:
+        try:
+            from app.storage import _IN_MEMORY_SESSIONS
+            if sess_token in _IN_MEMORY_SESSIONS:
+                return True
+        except Exception:
+            pass
 
     if not token:
         if require_auth:
@@ -98,6 +135,7 @@ def check_auth(request: Request) -> bool:
         return True
 
     return False
+
 
 
 def mask_api_key(key: Optional[str]) -> str:

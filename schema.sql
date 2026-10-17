@@ -74,4 +74,32 @@ CREATE TABLE IF NOT EXISTS developer_keys (
 );
 CREATE INDEX IF NOT EXISTS developer_keys_session_idx ON developer_keys (session_id);
 
+-- Phase 7: Registered Google Users & Authenticated Sessions
+CREATE TABLE IF NOT EXISTS users (
+    id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    google_id      TEXT UNIQUE,
+    email          TEXT UNIQUE NOT NULL,
+    name           TEXT,
+    picture        TEXT,
+    role           TEXT NOT NULL DEFAULT 'developer', -- 'admin' | 'developer'
+    provider       TEXT NOT NULL DEFAULT 'google',
+    created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    last_login_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    metadata       JSONB DEFAULT '{}'::jsonb
+);
+CREATE INDEX IF NOT EXISTS users_email_idx ON users (email);
+CREATE INDEX IF NOT EXISTS users_google_id_idx ON users (google_id);
+
+CREATE TABLE IF NOT EXISTS user_sessions (
+    token          TEXT PRIMARY KEY,
+    user_id        UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    email          TEXT NOT NULL,
+    name           TEXT,
+    role           TEXT NOT NULL DEFAULT 'developer',
+    created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    expires_at     TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS user_sessions_user_idx ON user_sessions (user_id);
+CREATE INDEX IF NOT EXISTS user_sessions_token_idx ON user_sessions (token);
+
 

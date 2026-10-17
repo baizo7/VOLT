@@ -1,9 +1,12 @@
 """
 Database access and persistence layer for PostgreSQL.
 """
+import datetime
 import json
 import logging
+import secrets
 from typing import Any, Dict, List, Optional
+import uuid
 import asyncpg
 from app.config import MAX_CHARS, logger
 from app.security import scrub_record
@@ -362,4 +365,225 @@ async def fetch_timeseries_stats(
             d["day"] = str(d["day"])
         result.append(d)
     return result
+
+
+_IN_MEMORY_USERS: Dict[str, dict] = {}
+_IN_MEMORY_SESSIONS: Dict[str, dict] = {}
+
+
+async def upsert_google_user(
+    pool: Optional[asyncpg.Pool],
+    email: str,
+    name: Optional[str] = None,
+    google_id: Optional[str] = None,
+    picture: Optional[str] = None,
+    role: str = "developer",
+    metadata: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """
+    Insert or update a registered Google user in PostgreSQL users table.
+    Supports in-memory fallback when database pool is None.
+    """
+    email_clean = email.strip().lower()
+    meta_json = json.dumps(metadata or {})
+    now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+
+    if pool is None:
+        user = _IN_MEMORY_USERS.get(email_clean)
+        if not user:
+            user_id = str(uuid.uuid4())
+            user = {
+                "id": user_id,
+                "google_id": google_id,
+                "email": email_clean,
+                "name": name or email_clean.split("@")[0],
+                "picture": picture,
+                "role": role,
+                "provider": "google",
+                "created_at": now_iso,
+                "last_login_at": now_iso,
+                "metadata": metadata or {},
+            }
+            _IN_MEMORY_USERS[email_clean] = user
+        else:
+            if name:
+                user["name"] = name
+            if picture:
+                user["picture"] = picture
+            if google_id:
+                user["google_id"] = google_id
+            user["last_login_at"] = now_iso
+            user["metadata"].update(metadata or {})
+        return dict(user)
+
+    async with pool.acquire() as c:
+        row = await c.fetchrow(
+            """
+            INSERT INTO users (google_id, email, name, picture, role, provider, created_at, last_login_at, metadata)
+            VALUES ($1, $2, $3, $4, $5, 'google', NOW(), NOW(), $6::jsonb)
+            ON CONFLICT (email) DO UPDATE SET
+                google_id = COALESCE(EXCLUDED.google_id, users.google_id),
+                name = COALESCE(EXCLUDED.name, users.name),
+                picture = COALESCE(EXCLUDED.picture, users.picture),
+                last_login_at = NOW(),
+                metadata = users.metadata || EXCLUDED.metadata
+            RETURNING id, google_id, email, name, picture, role, provider, created_at, last_login_at, metadata;
+            """,
+            google_id,
+            email_clean,
+            name,
+            picture,
+            role,
+            meta_json,
+        )
+        d = dict(row)
+        if d.get("id"):
+            d["id"] = str(d["id"])
+        if d.get("created_at") and hasattr(d["created_at"], "isoformat"):
+            d["created_at"] = d["created_at"].isoformat()
+        if d.get("last_login_at") and hasattr(d["last_login_at"], "isoformat"):
+            d["last_login_at"] = d["last_login_at"].isoformat()
+        if isinstance(d.get("metadata"), str):
+            try:
+                d["metadata"] = json.loads(d["metadata"])
+            except Exception:
+                pass
+        return d
+
+
+async def create_user_session(
+    pool: Optional[asyncpg.Pool],
+    user_id: str,
+    email: str,
+    name: Optional[str] = None,
+    role: str = "developer",
+    duration_days: int = 30,
+) -> Dict[str, Any]:
+    """Generate and store an authenticated session token for a user."""
+    token = f"volt_sess_{secrets.token_hex(24)}"
+    now = datetime.datetime.now(datetime.timezone.utc)
+    expires_at = now + datetime.timedelta(days=duration_days)
+
+    if pool is None:
+        sess_data = {
+            "token": token,
+            "user_id": user_id,
+            "email": email,
+            "name": name or email.split("@")[0],
+            "role": role,
+            "created_at": now.isoformat(),
+            "expires_at": expires_at.isoformat(),
+        }
+        _IN_MEMORY_SESSIONS[token] = sess_data
+        return sess_data
+
+    async with pool.acquire() as c:
+        await c.execute(
+            """
+            INSERT INTO user_sessions (token, user_id, email, name, role, created_at, expires_at)
+            VALUES ($1, $2::uuid, $3, $4, $5, NOW(), $6)
+            """,
+            token,
+            user_id,
+            email,
+            name,
+            role,
+            expires_at,
+        )
+    return {
+        "token": token,
+        "user_id": user_id,
+        "email": email,
+        "name": name,
+        "role": role,
+        "created_at": now.isoformat(),
+        "expires_at": expires_at.isoformat(),
+    }
+
+
+async def get_user_by_session_token(
+    pool: Optional[asyncpg.Pool],
+    token: str,
+) -> Optional[Dict[str, Any]]:
+    """Retrieve active user profile matching session token."""
+    if not token:
+        return None
+
+    if pool is None:
+        sess = _IN_MEMORY_SESSIONS.get(token)
+        if not sess:
+            return None
+        now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        if sess.get("expires_at") and sess["expires_at"] < now_iso:
+            _IN_MEMORY_SESSIONS.pop(token, None)
+            return None
+        return dict(sess)
+
+    async with pool.acquire() as c:
+        row = await c.fetchrow(
+            """
+            SELECT 
+                u.id, u.google_id, u.email, u.name, u.picture, u.role, u.provider,
+                u.created_at, u.last_login_at, s.token, s.expires_at
+            FROM user_sessions s
+            JOIN users u ON u.id = s.user_id
+            WHERE s.token = $1 AND s.expires_at > NOW()
+            """,
+            token,
+        )
+        if not row:
+            return None
+        d = dict(row)
+        d["id"] = str(d["id"])
+        if d.get("created_at") and hasattr(d["created_at"], "isoformat"):
+            d["created_at"] = d["created_at"].isoformat()
+        if d.get("last_login_at") and hasattr(d["last_login_at"], "isoformat"):
+            d["last_login_at"] = d["last_login_at"].isoformat()
+        if d.get("expires_at") and hasattr(d["expires_at"], "isoformat"):
+            d["expires_at"] = d["expires_at"].isoformat()
+        return d
+
+
+async def delete_user_session(pool: Optional[asyncpg.Pool], token: str):
+    """Log out a user by terminating their session."""
+    if not token:
+        return
+    if pool is None:
+        _IN_MEMORY_SESSIONS.pop(token, None)
+        return
+    try:
+        async with pool.acquire() as c:
+            await c.execute("DELETE FROM user_sessions WHERE token = $1", token)
+    except Exception as e:
+        logger.warning(f"Error removing user session: {e}")
+
+
+async def fetch_all_users(pool: Optional[asyncpg.Pool], limit: int = 100) -> List[Dict[str, Any]]:
+    """Fetch all registered account users for the admin dashboard."""
+    if pool is None:
+        return list(_IN_MEMORY_USERS.values())[:limit]
+
+    async with pool.acquire() as c:
+        rows = await c.fetch(
+            """
+            SELECT 
+                u.id, u.google_id, u.email, u.name, u.picture, u.role, u.provider,
+                u.created_at, u.last_login_at,
+                (SELECT count(*) FROM llm_calls WHERE session_id = u.email) AS call_count
+            FROM users u
+            ORDER BY u.last_login_at DESC
+            LIMIT $1
+            """,
+            limit,
+        )
+        results = []
+        for r in rows:
+            d = dict(r)
+            d["id"] = str(d["id"])
+            if d.get("created_at") and hasattr(d["created_at"], "isoformat"):
+                d["created_at"] = d["created_at"].isoformat()
+            if d.get("last_login_at") and hasattr(d["last_login_at"], "isoformat"):
+                d["last_login_at"] = d["last_login_at"].isoformat()
+            results.append(d)
+        return results
 
