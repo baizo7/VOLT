@@ -24,6 +24,15 @@ async def test_dashboard_with_auth(async_client, monkeypatch):
     resp = await async_client.get("/dashboard")
     assert resp.status_code == 401
 
+    # Browser request with Accept: text/html -> 302 redirect to /login
+    resp_browser = await async_client.get(
+        "/dashboard",
+        headers={"Accept": "text/html,application/xhtml+xml"},
+        follow_redirects=False
+    )
+    assert resp_browser.status_code == 302
+    assert resp_browser.headers["location"] == "/login"
+
     # Header auth -> 200
     resp_header = await async_client.get("/dashboard", headers={"X-Observer-Token": "secure-token"})
     assert resp_header.status_code == 200

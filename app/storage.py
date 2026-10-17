@@ -464,41 +464,36 @@ async def create_user_session(
     now = datetime.datetime.now(datetime.timezone.utc)
     expires_at = now + datetime.timedelta(days=duration_days)
 
-    if pool is None:
-        sess_data = {
-            "token": token,
-            "user_id": user_id,
-            "email": email,
-            "name": name or email.split("@")[0],
-            "role": role,
-            "created_at": now.isoformat(),
-            "expires_at": expires_at.isoformat(),
-        }
-        _IN_MEMORY_SESSIONS[token] = sess_data
-        return sess_data
-
-    async with pool.acquire() as c:
-        await c.execute(
-            """
-            INSERT INTO user_sessions (token, user_id, email, name, role, created_at, expires_at)
-            VALUES ($1, $2::uuid, $3, $4, $5, NOW(), $6)
-            """,
-            token,
-            user_id,
-            email,
-            name,
-            role,
-            expires_at,
-        )
-    return {
+    sess_data = {
         "token": token,
         "user_id": user_id,
         "email": email,
-        "name": name,
+        "name": name or email.split("@")[0],
         "role": role,
         "created_at": now.isoformat(),
         "expires_at": expires_at.isoformat(),
     }
+    _IN_MEMORY_SESSIONS[token] = sess_data
+
+    if pool is not None:
+        try:
+            async with pool.acquire() as c:
+                await c.execute(
+                    """
+                    INSERT INTO user_sessions (token, user_id, email, name, role, created_at, expires_at)
+                    VALUES ($1, $2::uuid, $3, $4, $5, NOW(), $6)
+                    """,
+                    token,
+                    user_id,
+                    email,
+                    name,
+                    role,
+                    expires_at,
+                )
+        except Exception as db_err:
+            logger.warning(f"Failed to persist user session to database: {db_err}")
+
+    return sess_data
 
 
 async def get_user_by_session_token(
@@ -532,6 +527,7 @@ async def get_user_by_session_token(
             token,
         )
         if not row:
+            _IN_MEMORY_SESSIONS.pop(token, None)
             return None
         d = dict(row)
         d["id"] = str(d["id"])
@@ -541,6 +537,17 @@ async def get_user_by_session_token(
             d["last_login_at"] = d["last_login_at"].isoformat()
         if d.get("expires_at") and hasattr(d["expires_at"], "isoformat"):
             d["expires_at"] = d["expires_at"].isoformat()
+
+        # Update in-memory session cache for fast synchronous auth checks
+        _IN_MEMORY_SESSIONS[token] = {
+            "token": token,
+            "user_id": d["id"],
+            "email": d["email"],
+            "name": d.get("name"),
+            "role": d.get("role", "developer"),
+            "created_at": d.get("created_at"),
+            "expires_at": d.get("expires_at"),
+        }
         return d
 
 
@@ -548,14 +555,13 @@ async def delete_user_session(pool: Optional[asyncpg.Pool], token: str):
     """Log out a user by terminating their session."""
     if not token:
         return
-    if pool is None:
-        _IN_MEMORY_SESSIONS.pop(token, None)
-        return
-    try:
-        async with pool.acquire() as c:
-            await c.execute("DELETE FROM user_sessions WHERE token = $1", token)
-    except Exception as e:
-        logger.warning(f"Error removing user session: {e}")
+    _IN_MEMORY_SESSIONS.pop(token, None)
+    if pool is not None:
+        try:
+            async with pool.acquire() as c:
+                await c.execute("DELETE FROM user_sessions WHERE token = $1", token)
+        except Exception as e:
+            logger.warning(f"Error removing user session: {e}")
 
 
 async def fetch_all_users(pool: Optional[asyncpg.Pool], limit: int = 100) -> List[Dict[str, Any]]:

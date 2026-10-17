@@ -100,10 +100,10 @@ async def test_auth_me_lifecycle(async_client):
     )
     token = login_resp.json()["token"]
 
-    # 3. Authenticated request with cookie
+    # 3. Authenticated request with cookie header
     resp_auth_cookie = await async_client.get(
         "/api/auth/me",
-        cookies={"volt_session": token}
+        headers={"Cookie": f"volt_session={token}"}
     )
     assert resp_auth_cookie.status_code == 200
     user = resp_auth_cookie.json()["user"]
@@ -133,7 +133,7 @@ async def test_auth_logout_terminates_session(async_client):
     # Log out
     logout_resp = await async_client.post(
         "/api/auth/logout",
-        cookies={"volt_session": token}
+        headers={"Cookie": f"volt_session={token}"}
     )
     assert logout_resp.status_code == 200
     assert logout_resp.json()["ok"] is True
@@ -141,7 +141,7 @@ async def test_auth_logout_terminates_session(async_client):
     # Check /api/auth/me after logout
     me_resp = await async_client.get(
         "/api/auth/me",
-        cookies={"volt_session": token}
+        headers={"Cookie": f"volt_session={token}"}
     )
     assert me_resp.json()["user"] is None
 

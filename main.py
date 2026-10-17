@@ -1853,6 +1853,9 @@ async def quota_and_loop_stats(
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard_view(request: Request):
     if not check_auth(request):
+        accept = request.headers.get("accept", "").lower()
+        if "text/html" in accept:
+            return RedirectResponse(url="/login", status_code=302)
         return JSONResponse({"error": "unauthorized"}, status_code=401)
     return HTMLResponse(content=DASHBOARD_HTML)
 
@@ -1860,6 +1863,9 @@ async def dashboard_view(request: Request):
 @app.get("/", response_class=HTMLResponse)
 async def root_view(request: Request):
     if not check_auth(request):
+        accept = request.headers.get("accept", "").lower()
+        if "text/html" in accept:
+            return RedirectResponse(url="/login", status_code=302)
         return JSONResponse({"error": "unauthorized"}, status_code=401)
     return HTMLResponse(content=DASHBOARD_HTML)
 
