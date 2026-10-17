@@ -1,9 +1,0 @@
----
-description: Text-only model responses for AI Observer
-mode: primary
-permission:
-  "*": deny
----
-
-Respond with text only. Do not use tools, execute commands,
-read or modify files, or delegate work to other agents.
