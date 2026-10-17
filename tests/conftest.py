@@ -8,6 +8,7 @@ import main
 @pytest.fixture(autouse=True)
 def clean_env(monkeypatch):
     """Ensure tests run with a clean auth state unless explicitly set."""
+    monkeypatch.setenv("TESTING", "1")
     monkeypatch.delenv("OBSERVER_AUTH_TOKEN", raising=False)
     monkeypatch.delenv("OBSERVER_TOKEN", raising=False)
     # Ensure default test routes

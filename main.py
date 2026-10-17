@@ -33,6 +33,10 @@ import httpx
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
 from pydantic import BaseModel
+from slowapi import Limiter
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
+from starlette.middleware.cors import CORSMiddleware
 
 # Modular component imports
 from app.config import (
@@ -262,7 +266,117 @@ async def lifespan(app):
         await pool.close()
 
 
+def get_client_ip(request: Request) -> str:
+    """Extract real client IP considering Cloudflare and reverse proxies."""
+    cf_ip = request.headers.get("cf-connecting-ip")
+    if cf_ip:
+        return cf_ip.strip()
+    x_forwarded = request.headers.get("x-forwarded-for")
+    if x_forwarded:
+        return x_forwarded.split(",")[0].strip()
+    if request.client:
+        return request.client.host
+    return "127.0.0.1"
+
+
+def get_rate_limit_key(request: Request) -> str:
+    """
+    Key function for rate limiting.
+    - Admin: keyed by admin token
+    - If user provides BYOK provider key: keyed by key hash (higher quota)
+    - If portal key: keyed by portal key hash
+    - If unauthenticated community user: keyed by client IP (burst rate limited)
+    """
+    auth = request.headers.get("authorization", "") or request.headers.get("x-api-key", "") or request.headers.get("x-volt-key", "")
+    token = auth.split(None, 1)[1] if auth.lower().startswith("bearer ") else auth
+    is_dummy = not token or token.lower() in ("test-key", "test_key", "none", "null", "undefined", "volt-cloud")
+
+    admin_key = os.environ.get("VOLT_ADMIN_KEY") or os.environ.get("OBSERVER_ADMIN_KEY")
+    if admin_key and token == admin_key:
+        return "admin:token"
+
+    if token and not is_dummy and not token.startswith("volt_live_") and not token.startswith("volt_"):
+        return f"byok:{hash_api_key(token)}"
+    if token and (token.startswith("volt_live_") or token.startswith("volt_")):
+        return f"portal:{hash_api_key(token)}"
+    return f"ip:{get_client_ip(request)}"
+
+
+def get_burst_rate_limit(key: str = "") -> str:
+    """
+    Dynamic rate limit rule taking the resolved client rate-limit key:
+    - Disabled when TESTING=1 or VOLT_RATE_LIMIT=0
+    - Admin: 10000/minute
+    - BYOK provider key: 120/minute
+    - Portal key: 30/minute
+    - Unauthenticated Community IP: 10/minute (protects free tier and prevents DDoS)
+    """
+    if os.environ.get("TESTING") == "1" or os.environ.get("VOLT_RATE_LIMIT", "1").lower() in ("0", "false", "no"):
+        return "10000/minute"
+
+    key_str = str(key or "")
+    if key_str.startswith("admin:"):
+        return "10000/minute"
+
+    if key_str.startswith("byok:"):
+        return "120/minute"
+
+    if key_str.startswith("portal:"):
+        return "30/minute"
+
+    return os.environ.get("VOLT_BURST_RATE_LIMIT", "10/minute")
+
+
+async def custom_rate_limit_handler(request: Request, exc: RateLimitExceeded) -> JSONResponse:
+    client_ip = get_client_ip(request)
+    logger.warning(f"Burst rate limit exceeded for client {client_ip}: {exc.detail}")
+    return JSONResponse(
+        {
+            "error": {
+                "message": (
+                    "Rate limit exceeded: Community requests are limited to 10 requests per minute per IP to prevent service abuse. "
+                    "To get unlimited access, enter your personal provider API key via 'volt activate' (BYOK) "
+                    "or generate a free API key at https://volt-ai-lmgz.onrender.com"
+                ),
+                "type": "rate_limit_exceeded",
+                "code": 429,
+                "retry_after": 60,
+            }
+        },
+        status_code=429,
+        headers={
+            "Retry-After": "60",
+            "x-volt-rate-limit": "exceeded",
+            "x-volt-tier": "free_community",
+        }
+    )
+
+
+limiter = Limiter(key_func=get_rate_limit_key)
 app = FastAPI(title="AI Model Observer", lifespan=lifespan)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, custom_rate_limit_handler)
+app.add_middleware(SlowAPIMiddleware)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=[
+        "x-volt-model",
+        "x-volt-track",
+        "x-volt-specialists",
+        "x-volt-latency-ms",
+        "x-volt-byok",
+        "x-volt-data-collection",
+        "x-volt-tier",
+        "x-volt-free-remaining",
+        "x-volt-quota-status",
+        "Retry-After",
+    ],
+)
 
 
 def resolve_route(model: str, style: str):
@@ -641,21 +755,25 @@ async def proxy(request: Request, style: str, project: str = None):
 
 # ---------- proxy endpoints ----------
 @app.post("/v1/chat/completions")
+@limiter.limit(get_burst_rate_limit)
 async def openai_route(request: Request):
     return await proxy(request, "openai")
 
 
 @app.post("/v1/messages")
+@limiter.limit(get_burst_rate_limit)
 async def anthropic_route(request: Request):
     return await proxy(request, "anthropic")
 
 
 @app.post("/p/{project}/v1/chat/completions")
+@limiter.limit(get_burst_rate_limit)
 async def openai_project_route(project: str, request: Request):
     return await proxy(request, "openai", project)
 
 
 @app.post("/p/{project}/v1/messages")
+@limiter.limit(get_burst_rate_limit)
 async def anthropic_project_route(project: str, request: Request):
     return await proxy(request, "anthropic", project)
 
