@@ -576,9 +576,9 @@ async def test_call_specialist_gemini_fallback_when_openrouter_fails_401(monkeyp
     assert text == "def gemini_fast_code(): return 42"
     assert in_tok == 15
     assert out_tok == 10
-    # Gemini call was dispatched and had the wire model stripped (e.g. gemini-2.5-flash without 'gemini/')
+    # Gemini call was dispatched and had the wire model stripped (e.g. gemini-flash-latest without 'gemini/')
     gemini_call = mock_client.post.call_args_list[-1]
-    assert gemini_call.kwargs["json"]["model"] == "gemini-2.5-flash"
+    assert gemini_call.kwargs["json"]["model"] == "gemini-flash-latest"
     assert gemini_call.kwargs["headers"]["Authorization"] == "Bearer test-gemini-key-12345"
 
 

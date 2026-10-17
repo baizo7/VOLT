@@ -43,7 +43,8 @@ SPECIALIST_CATALOG = {
     "fast_coder": {
         "model": "local/qwen2.5-coder:1.5b",
         "fallback_model": "qwen/qwen-2.5-coder-32b-instruct",
-        "gemini_fallback": "gemini/gemini-2.5-flash",
+        "gemini_fallback": "gemini/gemini-flash-latest",
+        "gemini_lite_fallback": "gemini/gemini-flash-lite-latest",
         "deepseek_fallback": "deepseek/deepseek-coder",
         "cloud_fallback": "qwen/qwen-2.5-coder-32b-instruct",
         "role": "Fast code generation and syntax synthesis (Apache 2.0)",
@@ -52,7 +53,8 @@ SPECIALIST_CATALOG = {
     "heavy_coder": {
         "model": "local/qwen2.5-coder:7b",
         "fallback_model": "qwen/qwen-2.5-coder-32b-instruct",
-        "gemini_fallback": "gemini/gemini-2.5-flash",
+        "gemini_fallback": "gemini/gemini-flash-latest",
+        "gemini_lite_fallback": "gemini/gemini-flash-lite-latest",
         "deepseek_fallback": "deepseek/deepseek-coder",
         "cloud_fallback": "qwen/qwen-2.5-coder-32b-instruct",
         "role": "Complex systems refactoring and multi-file codebases (Apache 2.0)",
@@ -61,7 +63,8 @@ SPECIALIST_CATALOG = {
     "deep_reasoner": {
         "model": "local/deepseek-r1:7b",
         "fallback_model": "deepseek/deepseek-reasoner",
-        "gemini_fallback": "gemini/gemini-2.5-pro",
+        "gemini_fallback": "gemini/gemini-flash-latest",
+        "gemini_lite_fallback": "gemini/gemini-flash-lite-latest",
         "cloud_fallback": "qwen/qwen-2.5-coder-32b-instruct",
         "role": "Step-by-step chain-of-thought, algorithm design & reasoning (MIT)",
         "license": "MIT"
@@ -69,7 +72,8 @@ SPECIALIST_CATALOG = {
     "math_specialist": {
         "model": "local/qwen2.5-math:7b",
         "fallback_model": "qwen/qwen-2.5-coder-32b-instruct",
-        "gemini_fallback": "gemini/gemini-2.5-flash",
+        "gemini_fallback": "gemini/gemini-flash-latest",
+        "gemini_lite_fallback": "gemini/gemini-flash-lite-latest",
         "cloud_fallback": "qwen/qwen-2.5-coder-32b-instruct",
         "role": "Mathematical proofs, numerical formulas & algorithmic proofs (Apache 2.0)",
         "license": "Apache 2.0"
@@ -77,7 +81,8 @@ SPECIALIST_CATALOG = {
     "vision_specialist": {
         "model": "local/qwen2-vl:7b",
         "fallback_model": "qwen/qwen-2-vl-72b-instruct",
-        "gemini_fallback": "gemini/gemini-2.5-flash",
+        "gemini_fallback": "gemini/gemini-flash-latest",
+        "gemini_lite_fallback": "gemini/gemini-flash-lite-latest",
         "cloud_fallback": "qwen/qwen-2-vl-72b-instruct",
         "role": "UI screenshot analysis and visual inspection (Apache 2.0)",
         "license": "Apache 2.0"
@@ -249,7 +254,7 @@ async def call_specialist(
             payload_messages.insert(0, {"role": "system", "content": custom_system_prompt})
 
     candidate_models = [primary_model, fallback_model]
-    for key in ("gemini_fallback", "deepseek_fallback", "cloud_fallback"):
+    for key in ("gemini_fallback", "gemini_lite_fallback", "deepseek_fallback", "cloud_fallback"):
         fb = spec.get(key)
         if fb and fb not in candidate_models:
             candidate_models.append(fb)
@@ -291,7 +296,15 @@ async def call_specialist(
             or len(client_raw_token) < 6
         )
 
-        if not target_model.startswith("local/"):
+        requires_auth = not target_model.startswith("local/")
+        has_credentials = bool(api_key or (client_auth_header and not is_portal_or_dummy))
+
+        # In production (non-mock), skip cloud candidates that lack credentials to avoid failing with 401
+        if requires_auth and not has_credentials and not hasattr(client, "mock_calls"):
+            logger.debug(f"Skipping specialist candidate '{target_model}': No server or client credentials configured.")
+            continue
+
+        if requires_auth:
             if not is_portal_or_dummy:
                 # Direct user provider key (BYOK)
                 is_gemini_route = "gemini" in target_model.lower() or "generativelanguage.googleapis" in url
