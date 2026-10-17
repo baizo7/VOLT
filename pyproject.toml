@@ -11,7 +11,7 @@ requires-python = ">=3.9"
 authors = [
     { name = "S Sanjai (Baizo)" }
 ]
-license = { text = "Apache-2.0" }
+license = "Apache-2.0"
 keywords = ["ai", "llm", "orchestration", "multi-model", "deepseek", "gemini", "code-generator", "cli"]
 classifiers = [
     "Development Status :: 4 - Beta",
