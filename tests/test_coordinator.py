@@ -545,3 +545,68 @@ async def test_generate_portal_api_key_endpoint(async_client):
     assert "curl" in data["instructions"]
 
 
+@pytest.mark.asyncio
+async def test_call_specialist_gemini_fallback_when_openrouter_fails_401(monkeypatch):
+    """Verify that when local and OpenRouter fail with 401, coordinator gracefully falls back to Gemini."""
+    monkeypatch.setenv("GEMINI_API_KEY", "test-gemini-key-12345")
+    mock_client = AsyncMock()
+
+    # Local fails with connect error
+    local_err = httpx.ConnectError("Connection refused")
+    # OpenRouter candidate fails with 401 Missing Authentication header
+    openrouter_fail = MagicMock()
+    openrouter_fail.status_code = 401
+    openrouter_fail.text = '{"error": "Missing Authentication header"}'
+    # Gemini candidate succeeds
+    gemini_success = MagicMock()
+    gemini_success.status_code = 200
+    gemini_success.json.return_value = {
+        "choices": [{"message": {"content": "def gemini_fast_code(): return 42"}}],
+        "usage": {"prompt_tokens": 15, "completion_tokens": 10}
+    }
+
+    mock_client.post.side_effect = [local_err, gemini_success]
+
+    text, in_tok, out_tok = await call_specialist(
+        client=mock_client,
+        specialist_key="fast_coder",
+        messages=[{"role": "user", "content": "Write test code"}]
+    )
+
+    assert text == "def gemini_fast_code(): return 42"
+    assert in_tok == 15
+    assert out_tok == 10
+    # Gemini call was dispatched and had the wire model stripped (e.g. gemini-2.5-flash without 'gemini/')
+    gemini_call = mock_client.post.call_args_list[-1]
+    assert gemini_call.kwargs["json"]["model"] == "gemini-2.5-flash"
+    assert gemini_call.kwargs["headers"]["Authorization"] == "Bearer test-gemini-key-12345"
+
+
+@pytest.mark.asyncio
+async def test_call_specialist_scrubs_portal_key_from_upstream_request(monkeypatch):
+    """Ensure internal portal keys (volt_live_...) are not forwarded directly as upstream provider headers."""
+    monkeypatch.setenv("GEMINI_API_KEY", "server-gemini-secret")
+    mock_client = AsyncMock()
+
+    success_resp = MagicMock()
+    success_resp.status_code = 200
+    success_resp.json.return_value = {
+        "choices": [{"message": {"content": "ok"}}],
+        "usage": {"prompt_tokens": 5, "completion_tokens": 2}
+    }
+    mock_client.post.side_effect = [httpx.ConnectError("No local"), success_resp]
+
+    await call_specialist(
+        client=mock_client,
+        specialist_key="fast_coder",
+        messages=[{"role": "user", "content": "test"}],
+        client_auth_header="Bearer volt_live_abcdef1234567890abcdef"
+    )
+
+    call_headers = mock_client.post.call_args_list[-1].kwargs["headers"]
+    # Should use the server's GEMINI_API_KEY, NOT the portal key!
+    assert call_headers["Authorization"] == "Bearer server-gemini-secret"
+    assert "volt_live_" not in call_headers["Authorization"]
+
+
+

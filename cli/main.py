@@ -342,14 +342,15 @@ def cmd_test(args: argparse.Namespace) -> int:
     """Send a minimal test request to verify end-to-end proxy connectivity."""
     cfg = load_config()
     server = (args.server or get_server_url(cfg)).rstrip("/")
-    key = args.key or cfg.get("api_key") or os.environ.get("OPENAI_API_KEY")
+    raw_key = args.key or cfg.get("api_key") or os.environ.get("OPENAI_API_KEY")
+    is_dummy = not raw_key or str(raw_key).strip().lower() in ("test-key", "test_key", "none", "null", "undefined", "your-api-key")
+    key = None if is_dummy else str(raw_key).strip()
     if not key:
         print("[!] Note: No personal API key found in ~/.volt-ai/config.json.")
-        print("    If BYOK is enabled on the server, please set your provider API key via 'volt activate', or pass --key <KEY>.")
-        key = "test-key"
+        print("    Operating under Free Community Tier (or run 'volt activate' to attach your personal provider key).")
     user = args.user or cfg.get("user") or "cli-tester"
     project = args.project or cfg.get("project") or "test-project"
-    model = args.model or "gemini-3.1-flash-lite-preview"
+    model = args.model or "VOLT-AI"
 
     print(f"[+] Testing proxy route at {server}/v1/chat/completions using model '{model}'...")
     payload = {
@@ -360,11 +361,12 @@ def cmd_test(args: argparse.Namespace) -> int:
     data = json.dumps(payload).encode("utf-8")
     headers = {
         "Content-Type": "application/json",
-        "Authorization": f"Bearer {key}",
         "X-Session-Id": user,
         "X-Project": project,
         "X-Task-Id": "cli-healthcheck",
     }
+    if key:
+        headers["Authorization"] = f"Bearer {key}"
 
     try:
         req = urllib.request.Request(f"{server}/v1/chat/completions", data=data, headers=headers, method="POST")

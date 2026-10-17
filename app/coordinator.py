@@ -43,18 +43,25 @@ SPECIALIST_CATALOG = {
     "fast_coder": {
         "model": "local/qwen2.5-coder:1.5b",
         "fallback_model": "qwen/qwen-2.5-coder-32b-instruct",
+        "gemini_fallback": "gemini/gemini-2.5-flash",
+        "deepseek_fallback": "deepseek/deepseek-coder",
+        "cloud_fallback": "qwen/qwen-2.5-coder-32b-instruct",
         "role": "Fast code generation and syntax synthesis (Apache 2.0)",
         "license": "Apache 2.0"
     },
     "heavy_coder": {
         "model": "local/qwen2.5-coder:7b",
         "fallback_model": "qwen/qwen-2.5-coder-32b-instruct",
+        "gemini_fallback": "gemini/gemini-2.5-flash",
+        "deepseek_fallback": "deepseek/deepseek-coder",
+        "cloud_fallback": "qwen/qwen-2.5-coder-32b-instruct",
         "role": "Complex systems refactoring and multi-file codebases (Apache 2.0)",
         "license": "Apache 2.0"
     },
     "deep_reasoner": {
         "model": "local/deepseek-r1:7b",
-        "fallback_model": "deepseek-reasoner",
+        "fallback_model": "deepseek/deepseek-reasoner",
+        "gemini_fallback": "gemini/gemini-2.5-pro",
         "cloud_fallback": "qwen/qwen-2.5-coder-32b-instruct",
         "role": "Step-by-step chain-of-thought, algorithm design & reasoning (MIT)",
         "license": "MIT"
@@ -62,12 +69,16 @@ SPECIALIST_CATALOG = {
     "math_specialist": {
         "model": "local/qwen2.5-math:7b",
         "fallback_model": "qwen/qwen-2.5-coder-32b-instruct",
+        "gemini_fallback": "gemini/gemini-2.5-flash",
+        "cloud_fallback": "qwen/qwen-2.5-coder-32b-instruct",
         "role": "Mathematical proofs, numerical formulas & algorithmic proofs (Apache 2.0)",
         "license": "Apache 2.0"
     },
     "vision_specialist": {
         "model": "local/qwen2-vl:7b",
         "fallback_model": "qwen/qwen-2-vl-72b-instruct",
+        "gemini_fallback": "gemini/gemini-2.5-flash",
+        "cloud_fallback": "qwen/qwen-2-vl-72b-instruct",
         "role": "UI screenshot analysis and visual inspection (Apache 2.0)",
         "license": "Apache 2.0"
     }
@@ -238,8 +249,21 @@ async def call_specialist(
             payload_messages.insert(0, {"role": "system", "content": custom_system_prompt})
 
     candidate_models = [primary_model, fallback_model]
-    if "cloud_fallback" in spec and spec["cloud_fallback"] not in candidate_models:
-        candidate_models.append(spec["cloud_fallback"])
+    for key in ("gemini_fallback", "deepseek_fallback", "cloud_fallback"):
+        fb = spec.get(key)
+        if fb and fb not in candidate_models:
+            candidate_models.append(fb)
+
+    # If server has GEMINI_API_KEY or GOOGLE_API_KEY but not OPENROUTER_API_KEY, prioritize Gemini ahead of OpenRouter
+    has_openrouter = bool(os.environ.get("OPENROUTER_API_KEY"))
+    has_gemini = bool(os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY"))
+    if has_gemini and not has_openrouter:
+        gemini_models = [m for m in candidate_models if "gemini" in m.lower()]
+        other_models = [m for m in candidate_models if "gemini" not in m.lower()]
+        # Keep local runner first, then Gemini models, then remaining cloud models
+        local_models = [m for m in other_models if m.startswith("local/")]
+        rest_models = [m for m in other_models if not m.startswith("local/")]
+        candidate_models = local_models + gemini_models + rest_models
 
     last_err = None
 
@@ -247,23 +271,68 @@ async def call_specialist(
         route = resolve_route(target_model, "openai", routes_map)
         url = route["base_url"].rstrip("/") + "/chat/completions"
         headers = {"Content-Type": "application/json"}
-        api_key = os.environ.get(route.get("api_key_env") or "")
+        api_key_env = route.get("api_key_env")
+        api_key = os.environ.get(api_key_env or "")
+        if not api_key and ("gemini" in target_model.lower() or "gemini" in url.lower()):
+            api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
 
-        # BYOK: Prioritize user's provided direct provider API key so usage is billed to their account.
-        # If client has a portal key (volt_live_...) or free starter tier, fall back to server env key.
-        is_direct_provider_key = bool(
-            client_auth_header
-            and not ("volt_live_" in client_auth_header or "volt_" in client_auth_header)
+        # Extract client raw token
+        client_raw_token = ""
+        if client_auth_header:
+            parts = client_auth_header.split(None, 1)
+            client_raw_token = parts[1] if (len(parts) == 2 and parts[0].lower() == "bearer") else client_auth_header
+
+        # Check if client key is an internal portal key or dummy placeholder
+        is_portal_or_dummy = bool(
+            not client_raw_token
+            or client_raw_token.startswith("volt_live_")
+            or client_raw_token.startswith("volt_")
+            or client_raw_token.lower() in ("test-key", "test_key", "anonymous", "volt-cloud", "none", "null", "undefined", "your-api-key")
+            or len(client_raw_token) < 6
         )
-        if is_direct_provider_key and not target_model.startswith("local/"):
-            headers["Authorization"] = client_auth_header
-        elif api_key:
-            headers["Authorization"] = f"Bearer {api_key}"
-        elif client_auth_header and not target_model.startswith("local/"):
-            headers["Authorization"] = client_auth_header
 
-        # Strip 'local/' prefix when transmitting model name to local runner
-        wire_model = target_model[6:] if target_model.startswith("local/") else target_model
+        if not target_model.startswith("local/"):
+            if not is_portal_or_dummy:
+                # Direct user provider key (BYOK)
+                is_gemini_route = "gemini" in target_model.lower() or "generativelanguage.googleapis" in url
+                is_openrouter_route = "openrouter.ai" in url
+                is_deepseek_route = "deepseek.com" in url or "deepseek" in target_model.lower()
+
+                if is_gemini_route:
+                    if client_raw_token.startswith("AIza"):
+                        headers["Authorization"] = f"Bearer {client_raw_token}"
+                    elif api_key:
+                        headers["Authorization"] = f"Bearer {api_key}"
+                    else:
+                        headers["Authorization"] = client_auth_header
+                elif is_openrouter_route:
+                    if client_raw_token.startswith("sk-or-"):
+                        headers["Authorization"] = f"Bearer {client_raw_token}"
+                    elif api_key:
+                        headers["Authorization"] = f"Bearer {api_key}"
+                    else:
+                        headers["Authorization"] = client_auth_header
+                elif is_deepseek_route:
+                    if client_raw_token.startswith("sk-") and not client_raw_token.startswith("sk-or-"):
+                        headers["Authorization"] = f"Bearer {client_raw_token}"
+                    elif api_key:
+                        headers["Authorization"] = f"Bearer {api_key}"
+                    else:
+                        headers["Authorization"] = client_auth_header
+                else:
+                    headers["Authorization"] = client_auth_header
+            elif api_key:
+                # Portal key or free starter tier: use server-side provider credentials
+                headers["Authorization"] = f"Bearer {api_key}"
+            elif client_auth_header and not is_portal_or_dummy:
+                headers["Authorization"] = client_auth_header
+
+        # Strip prefixes when transmitting wire model name to upstream provider
+        wire_model = target_model
+        for prefix in ("local/", "gemini/", "deepseek/", "openai/"):
+            if wire_model.startswith(prefix):
+                wire_model = wire_model[len(prefix):]
+                break
 
         body = {
             "model": wire_model,
@@ -304,10 +373,21 @@ async def call_specialist(
             logger.warning(f"Specialist call to '{target_model}' on '{url}' failed: {e}; trying candidate...")
 
     # All candidate models failed - raise informative error rather than returning fake 200
-    logger.error(f"All specialist candidates failed for {specialist_key}. Last error: {last_err}")
+    has_any_server_key = bool(
+        os.environ.get("OPENROUTER_API_KEY")
+        or os.environ.get("GEMINI_API_KEY")
+        or os.environ.get("GOOGLE_API_KEY")
+        or os.environ.get("DEEPSEEK_API_KEY")
+        or os.environ.get("OPENAI_API_KEY")
+    )
+    hint = ""
+    if not has_any_server_key:
+        hint = " (No upstream provider API keys configured on server. Please configure OPENROUTER_API_KEY or GEMINI_API_KEY in the backend environment variables, or pass your personal API key via 'volt activate')"
+    error_msg = f"All specialist candidates failed for {specialist_key}. Last error: {last_err}{hint}"
+    logger.error(error_msg)
     raise SpecialistExecutionError(
         specialist_key=specialist_key,
-        message=f"All specialist candidates failed for {specialist_key}. Last error: {last_err}"
+        message=error_msg,
     )
 
 
@@ -367,7 +447,7 @@ async def coordinate_request(
     # 2. BYOK Provider Key: e.g. OpenRouter, DeepSeek, Gemini, OpenAI
     # 3. No Key / Dummy Key: Free Starter Tier (Option 1)
     is_portal_key = bool(client_key and (client_key.startswith("volt_live_") or client_key.startswith("volt_")))
-    dummy_keys = {"", "none", "null", "volt-cloud", "anonymous", "undefined"}
+    dummy_keys = {"", "none", "null", "volt-cloud", "anonymous", "undefined", "test-key", "test_key", "your-api-key", "dummy", "test"}
     is_missing_or_dummy = not client_key or client_key.lower() in dummy_keys or len(client_key) < 6
 
     dev_session = (
