@@ -7,6 +7,7 @@
 [![Platform License: Proprietary](https://img.shields.io/badge/Platform%20License-Proprietary%20%2F%20Source--Available-red.svg)](LICENSE)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/)
 [![Cloud Endpoint](https://img.shields.io/badge/Render-Live%20Endpoint-46E3B7.svg)](https://volt-ai-lmgz.onrender.com)
+[![BYOK Architecture](https://img.shields.io/badge/Access-Bring--Your--Own--Key%20%28BYOK%29-orange.svg)]()
 
 ---
 
@@ -22,11 +23,52 @@
 VOLT-AI provides next-generation AI coordination, dynamic specialist fallback, and real-time observability for modern software development:
 
 - **Open-Source VOLT-AI Model (`volt-ai-1.0`)**: Open model card and inference schema for code generation, architectural synthesis, and multi-turn refactoring.
+- **Bring-Your-Own-Key (BYOK) Data Flywheel**: Users access the coordinated model by providing their own LLM provider API key (OpenRouter, DeepSeek, Gemini, or OpenAI). Users pay their own provider directly for tokens while their development activities and verified solutions are captured to continuously train and improve future VOLT model releases.
 - **Intelligent Routing**: Seamlessly routes complex coding tasks to the highest-performing models (Claude 3.7, DeepSeek-Coder, Gemini 2.5/3, OpenRouter, and local LLMs) with automatic fallbacks.
-- **Client Tooling (`volt-coder` & `volt`)**: Local terminal CLI for one-shot coding, interactive chat sessions, and usage metrics.
+- **Client Tooling (`volt-coder` & `volt`)**: Local terminal CLI for one-shot coding, interactive chat sessions, and personal token usage analytics.
 - **Universal Drop-in Proxy**: OpenAI & Anthropic API compatible proxy supporting Cursor, Aider, OpenCode, VS Code extensions, and native SDKs.
 - **Zero-Leak Secret Redaction**: In-flight redaction of API keys, AWS credentials, GitHub tokens, and private keys before persistence.
 - **Live Observability Dashboard**: Real-time glassmorphism analytics dashboard tracking tokens, latency, cost, and test pass rates.
+
+---
+
+## 🔄 The BYOK Data Collection Flywheel
+
+VOLT-AI connects model access directly with an automated data collection and fine-tuning flywheel:
+
+```
+┌─────────────────────────────────┐
+│   Developer / External User     │
+│   (Terminal CLI, Cursor, etc.)  │
+└────────────────┬────────────────┘
+                 │
+                 │ 1. Supplies THEIR OWN provider API key (OpenRouter, DeepSeek, Gemini, OpenAI)
+                 │    via 'volt activate' or 'Authorization: Bearer <your-key>'
+                 ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                        ⚡ VOLT-AI Engine                               │
+│                                                                        │
+│ 2. BYOK Gatekeeper: Verifies the caller provided an active key.       │
+│    (Rejects unauthorized requests with 401).                           │
+│                                                                        │
+│ 3. Execution: Dispatches request to provider using THE USER'S KEY.     │
+│    (The provider bills the user's account — zero cost to host).        │
+│                                                                        │
+│ 4. Zero-Leak Redaction: Strips API keys, passwords, and tokens.        │
+│                                                                        │
+│ 5. Data Collection: Records prompts, generated code, latency, and     │
+│    session metrics to PostgreSQL (llm_calls table).                    │
+└────────────────┬───────────────────────────────────────────────────────┘
+                 │
+                 ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                   Continuous Learning Pipeline                         │
+│                                                                        │
+│ • POST /admin/export-dataset: Automatically exports SFT and DPO pairs. │
+│ • training/train_lora.py: Fine-tunes future open-weight VOLT models   │
+│   directly on real-world developer interactions!                       │
+└────────────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
@@ -38,6 +80,7 @@ The **VOLT-AI Model** is released under the **Apache 2.0 Open-Source License**.
 - **Model ID**: `VOLT-AI` / `volt-ai-1.0`
 - **Architecture**: Multi-Model Coordinated Specialist Mixture
 - **Specializations**: Code synthesis, test-driven repair, system architecture, rapid debugging
+- **Access Model**: Bring-Your-Own-Key (BYOK)
 - **Context Routing**:
   - `code` track: Specialized code generation and bug fixes
   - `general` track: Multi-turn architectural explanation and reasoning
@@ -72,9 +115,9 @@ source .venv/bin/activate
 pip install -e .
 ```
 
-### 2. Configure Your Local Client
+### 2. Configure Your Local Client with Your API Key
 
-Run the interactive setup to configure your terminal:
+Run the interactive setup to configure your terminal and save your provider key:
 
 ```bash
 # Point to the official central cloud server (default)
@@ -83,6 +126,12 @@ volt activate --server https://volt-ai-lmgz.onrender.com
 # Or point to a custom self-hosted endpoint
 volt activate --server http://localhost:8787
 ```
+
+During setup, enter your personal provider API key:
+- **OpenRouter** ([openrouter.ai/keys](https://openrouter.ai/keys)) *(Recommended for access to all models)*
+- **DeepSeek** ([platform.deepseek.com](https://platform.deepseek.com))
+- **Google Gemini** ([aistudio.google.com](https://aistudio.google.com))
+- **OpenAI** ([platform.openai.com](https://platform.openai.com))
 
 This saves your local configuration to `~/.volt-ai/config.json`.
 
@@ -132,21 +181,21 @@ Add the following configuration to your terminal profile or IDE settings:
 #### Windows PowerShell (`$PROFILE`):
 ```powershell
 $env:OPENAI_BASE_URL = "https://volt-ai-lmgz.onrender.com/v1"
-$env:OPENAI_API_KEY  = "volt-client-key"
+$env:OPENAI_API_KEY  = "your-provider-api-key"   # e.g. OpenRouter, DeepSeek, or OpenAI key
 $env:X_SESSION_ID    = $env:USERNAME
 ```
 
 #### Linux / macOS (`~/.bashrc` or `~/.zshrc`):
 ```bash
 export OPENAI_BASE_URL="https://volt-ai-lmgz.onrender.com/v1"
-export OPENAI_API_KEY="volt-client-key"
+export OPENAI_API_KEY="your-provider-api-key"    # e.g. OpenRouter, DeepSeek, or OpenAI key
 export X_SESSION_ID="$USER"
 ```
 
 ### 2. Anthropic SDK & Claude CLI
 ```bash
 export ANTHROPIC_BASE_URL="https://volt-ai-lmgz.onrender.com"
-export ANTHROPIC_API_KEY="your-key"
+export ANTHROPIC_API_KEY="your-anthropic-key"
 ```
 
 ### 3. Model Name to Use in Tools
@@ -170,7 +219,7 @@ Specify either:
 Verify your local client installation:
 
 ```bash
-# Run client and routing unit tests (159 tests passing)
+# Run unit & API test suite (161 tests passing)
 pytest -m "not integration"
 ```
 

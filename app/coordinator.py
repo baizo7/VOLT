@@ -22,6 +22,8 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, Response, StreamingResponse
 
 from app.routing import resolve_route
+from app.security import hash_api_key, mask_api_key
+from app.storage import record_developer_key
 
 logger = logging.getLogger("observer.coordinator")
 
@@ -208,10 +210,11 @@ async def call_specialist(
         url = route["base_url"].rstrip("/") + "/chat/completions"
         headers = {"Content-Type": "application/json"}
         api_key = os.environ.get(route.get("api_key_env") or "")
-        if api_key:
-            headers["Authorization"] = f"Bearer {api_key}"
-        elif client_auth_header and not target_model.startswith("local/"):
+        # BYOK: Prioritize user's provided API key so usage is billed to their account
+        if client_auth_header and not target_model.startswith("local/"):
             headers["Authorization"] = client_auth_header
+        elif api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
 
         # Strip 'local/' prefix when transmitting model name to local runner
         wire_model = target_model[6:] if target_model.startswith("local/") else target_model
@@ -294,15 +297,86 @@ async def coordinate_request(
 
     logger.info(f"VOLT-AI activated ({out_model}): track='{track}', specialists={specialists}, reason='{reason}'")
 
-    # Extract client authorization if provided (BYOK fallback when server env key is absent)
-    observer_token = os.environ.get("OBSERVER_AUTH_TOKEN") or os.environ.get("OBSERVER_TOKEN")
-    client_raw = request.headers.get("authorization", "").strip() or request.headers.get("x-api-key", "").strip()
+    # Extract client authorization (BYOK: Bring Your Own Key)
+    observer_token = (
+        os.environ.get("VOLT_AUTH_TOKEN")
+        or os.environ.get("OBSERVER_AUTH_TOKEN")
+        or os.environ.get("OBSERVER_TOKEN")
+    )
+    client_raw = (
+        request.headers.get("authorization", "").strip()
+        or request.headers.get("x-api-key", "").strip()
+        or request.headers.get("x-volt-key", "").strip()
+    )
+    client_key = ""
     client_auth = None
     if client_raw:
         parts = client_raw.split(None, 1)
-        raw_key = parts[1] if (len(parts) == 2 and parts[0].lower() == "bearer") else client_raw
-        if not (observer_token and raw_key == observer_token):
+        client_key = parts[1] if (len(parts) == 2 and parts[0].lower() == "bearer") else client_raw
+        if not (observer_token and client_key == observer_token):
             client_auth = client_raw if client_raw.lower().startswith("bearer ") else f"Bearer {client_raw}"
+
+    # BYOK Enforcement: Check if user provided an LLM provider API key to access VOLT-AI
+    dummy_keys = {"", "none", "null", "volt-cloud", "anonymous", "undefined"}
+    is_missing_or_dummy = not client_key or client_key.lower() in dummy_keys or len(client_key) < 6
+
+    # Allow disabling BYOK enforcement via environment flag if explicitly set (default: True)
+    require_user_key = os.environ.get("VOLT_REQUIRE_USER_KEY", "1").lower() in ("1", "true", "yes")
+
+    if require_user_key and is_missing_or_dummy:
+        logger.warning("VOLT-AI request rejected: Missing or invalid user API key (BYOK required).")
+        return JSONResponse(
+            {
+                "error": {
+                    "message": (
+                        "VOLT-AI operates on a Bring-Your-Own-Key (BYOK) model. "
+                        "Please provide your own LLM provider API key (OpenRouter, DeepSeek, Gemini, or OpenAI) "
+                        "in the 'Authorization: Bearer <your-key>' header or configure it via 'volt activate'."
+                    ),
+                    "type": "authentication_required",
+                    "code": 401,
+                    "param": "Authorization",
+                }
+            },
+            status_code=401,
+            headers={
+                "WWW-Authenticate": 'Bearer realm="VOLT-AI BYOK"',
+                "x-volt-byok": "required",
+            },
+        )
+
+    # Telemetry and Key Identity tracking for the Data Collection Pipeline
+    dev_session = request.headers.get("x-session-id") or request.headers.get("x-user") or request.headers.get("user") or "anonymous-session"
+    effective_project = project or request.headers.get("x-project") or "default"
+    k_masked = mask_api_key(client_key)
+    k_hash = hash_api_key(client_key)
+
+    provider = "custom"
+    lower_k = client_key.lower()
+    if "sk-or-" in lower_k or "openrouter" in lower_k:
+        provider = "openrouter"
+    elif "aiza" in lower_k:
+        provider = "gemini"
+    elif "sk-ant" in lower_k:
+        provider = "anthropic"
+    elif "deepseek" in lower_k:
+        provider = "deepseek"
+    elif "sk-" in lower_k:
+        provider = "openai"
+
+    if pool is not None and k_hash != "anonymous":
+        try:
+            await record_developer_key(
+                pool=pool,
+                key_hash=k_hash,
+                session_id=dev_session,
+                project=effective_project,
+                key_masked=k_masked,
+                provider=provider,
+                model=out_model,
+            )
+        except Exception as k_err:
+            logger.warning(f"Failed to record developer key in coordinator: {k_err}")
 
     total_in = 0
     total_out = 0
@@ -388,9 +462,9 @@ async def coordinate_request(
         task_id = request.headers.get("x-task-id") or str(uuid.uuid4())
         call_meta = {
             "id": str(uuid.uuid4()),
-            "project": project or request.headers.get("x-project"),
+            "project": effective_project,
             "task_id": task_id,
-            "session_id": request.headers.get("x-session-id") or request.headers.get("x-user"),
+            "session_id": dev_session,
             "task_type": "coding:volt_coordinated",
             "model": out_model,
             "upstream": "internal:coordinator",
@@ -420,6 +494,8 @@ async def coordinate_request(
             "x-observer-specialists": ",".join(specialists),
             "x-volt-latency-ms": str(latency_ms),
             "x-observer-latency-ms": str(latency_ms),
+            "x-volt-byok": "active",
+            "x-volt-data-collection": "active",
         }
         brand_label = "ObserverCoder" if out_model == "observer-coder-1.0" else "VOLT-AI"
         return JSONResponse(
@@ -441,9 +517,9 @@ async def coordinate_request(
     task_id = request.headers.get("x-task-id") or str(uuid.uuid4())
     call_meta = {
         "id": str(uuid.uuid4()),
-        "project": project or request.headers.get("x-project"),
+        "project": effective_project,
         "task_id": task_id,
-        "session_id": request.headers.get("x-session-id") or request.headers.get("x-user"),
+        "session_id": dev_session,
         "task_type": "coding:volt_coordinated",
         "model": out_model,
         "upstream": "internal:coordinator",
@@ -478,6 +554,8 @@ async def coordinate_request(
         "x-observer-specialists": ",".join(specialists),
         "x-volt-latency-ms": str(latency_ms),
         "x-observer-latency-ms": str(latency_ms),
+        "x-volt-byok": "active",
+        "x-volt-data-collection": "active",
     }
 
     if streamed:

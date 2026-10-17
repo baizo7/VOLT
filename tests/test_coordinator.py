@@ -89,7 +89,11 @@ async def test_observer_coder_endpoint_non_streaming(async_client, monkeypatch):
         "stream": False
     }
 
-    resp = await async_client.post("/v1/chat/completions", json=payload)
+    resp = await async_client.post(
+        "/v1/chat/completions",
+        json=payload,
+        headers={"Authorization": "Bearer sk-or-v1-test-developer-key"}
+    )
     assert resp.status_code == 200
     data = resp.json()
 
@@ -100,6 +104,8 @@ async def test_observer_coder_endpoint_non_streaming(async_client, monkeypatch):
     assert data["observer_coordination"]["track"] == "fast_coding"
     assert "fast_coder" in data["observer_coordination"]["specialists_used"]
     assert resp.headers.get("x-observer-model") == "observer-coder-1.0"
+    assert resp.headers.get("x-volt-byok") == "active"
+    assert resp.headers.get("x-volt-data-collection") == "active"
 
 
 @pytest.mark.asyncio
@@ -132,7 +138,11 @@ async def test_observer_coder_two_pass_reasoning(async_client, monkeypatch):
         "stream": False
     }
 
-    resp = await async_client.post("/v1/chat/completions", json=payload)
+    resp = await async_client.post(
+        "/v1/chat/completions",
+        json=payload,
+        headers={"Authorization": "Bearer sk-or-v1-test-developer-key"}
+    )
     assert resp.status_code == 200
     data = resp.json()
 
@@ -161,9 +171,15 @@ async def test_observer_coder_endpoint_streaming(async_client, monkeypatch):
         "stream": True
     }
 
-    resp = await async_client.post("/v1/chat/completions", json=payload)
+    resp = await async_client.post(
+        "/v1/chat/completions",
+        json=payload,
+        headers={"Authorization": "Bearer sk-or-v1-test-developer-key"}
+    )
     assert resp.status_code == 200
     assert "text/event-stream" in resp.headers.get("content-type", "")
+    assert resp.headers.get("x-volt-byok") == "active"
+    assert resp.headers.get("x-volt-data-collection") == "active"
 
     lines = resp.text.strip().split("\n\n")
     assert any("[DONE]" in line for line in lines)
@@ -284,7 +300,11 @@ async def test_observer_coder_endpoint_failure_returns_502(async_client, monkeyp
         "stream": False
     }
 
-    resp = await async_client.post("/v1/chat/completions", json=payload)
+    resp = await async_client.post(
+        "/v1/chat/completions",
+        json=payload,
+        headers={"Authorization": "Bearer sk-or-v1-test-developer-key"}
+    )
     assert resp.status_code == 502
     data = resp.json()
     assert "error" in data
@@ -340,7 +360,11 @@ async def test_volt_ai_endpoint_non_streaming(async_client, monkeypatch):
         "stream": False
     }
 
-    resp = await async_client.post("/v1/chat/completions", json=payload)
+    resp = await async_client.post(
+        "/v1/chat/completions",
+        json=payload,
+        headers={"Authorization": "Bearer sk-or-v1-test-developer-key"}
+    )
     assert resp.status_code == 200
     data = resp.json()
 
@@ -350,6 +374,8 @@ async def test_volt_ai_endpoint_non_streaming(async_client, monkeypatch):
     assert data["volt_coordination"]["track"] == "fast_coding"
     assert resp.headers.get("x-volt-model") == "VOLT-AI"
     assert resp.headers.get("x-observer-model") == "VOLT-AI"
+    assert resp.headers.get("x-volt-byok") == "active"
+    assert resp.headers.get("x-volt-data-collection") == "active"
 
 
 @pytest.mark.asyncio
@@ -361,4 +387,39 @@ async def test_volt_ai_models_listing(async_client):
     assert "VOLT-AI" in model_ids
     assert "volt-ai-1.0" in model_ids
     assert "observer-coder-1.0" in model_ids
+
+
+@pytest.mark.asyncio
+async def test_volt_ai_requires_byok_api_key(async_client):
+    """Ensure requests to VOLT-AI without a user API key return 401 Unauthorized with BYOK requirement."""
+    payload = {
+        "model": "VOLT-AI",
+        "messages": [{"role": "user", "content": "Write quicksort"}],
+        "stream": False
+    }
+    # No Authorization header
+    resp = await async_client.post("/v1/chat/completions", json=payload)
+    assert resp.status_code == 401
+    data = resp.json()
+    assert "error" in data
+    assert "Bring-Your-Own-Key" in data["error"]["message"]
+    assert resp.headers.get("x-volt-byok") == "required"
+
+
+@pytest.mark.asyncio
+async def test_volt_ai_byok_dummy_keys_rejected(async_client):
+    """Ensure dummy placeholder keys ('volt-cloud', 'none', short keys) are rejected."""
+    payload = {
+        "model": "VOLT-AI",
+        "messages": [{"role": "user", "content": "Write quicksort"}],
+        "stream": False
+    }
+    for dummy in ["volt-cloud", "none", "null", "abc"]:
+        resp = await async_client.post(
+            "/v1/chat/completions",
+            json=payload,
+            headers={"Authorization": f"Bearer {dummy}"}
+        )
+        assert resp.status_code == 401
+        assert resp.headers.get("x-volt-byok") == "required"
 

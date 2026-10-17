@@ -94,7 +94,10 @@ def cmd_activate(args: argparse.Namespace) -> int:
         if input_proj:
             project = input_proj
         if not key:
-            input_key = input("Your Personal API Key (Gemini, Claude, OpenRouter, or OpenAI) [press enter to keep empty]: ").strip()
+            print("\n⚡ VOLT-AI operates on a Bring-Your-Own-Key (BYOK) model.")
+            print("To use the VOLT-AI model, please supply your personal provider API key")
+            print("(e.g. OpenRouter [https://openrouter.ai/keys], DeepSeek, Gemini, or OpenAI).")
+            input_key = input("Your Provider API Key [or enter to configure later]: ").strip()
             if input_key:
                 key = input_key
 
@@ -131,11 +134,11 @@ def cmd_activate(args: argparse.Namespace) -> int:
     print(f"Project      : {project}")
     print(f"Proxy BaseURL: {proxy_v1}")
     if is_claude:
-        print(f"Detected Key : Anthropic Claude ({key[:10]}...)")
+        print(f"Detected Key : Anthropic Claude ({key[:10]}...) [BYOK Active]")
     elif key:
-        print(f"Detected Key : Custom / Provider ({key[:8]}...)")
+        print(f"Detected Key : Provider API Key ({key[:8]}...) [BYOK Active]")
     else:
-        print("Detected Key : None (VOLT-AI cloud fallback active)")
+        print("Detected Key : None (⚠️ Key required when executing volt-coder tasks)")
     print("=" * 60)
 
     print("\nTo route your current terminal session through VOLT-AI, run:")
@@ -769,7 +772,22 @@ def cmd_code(args: argparse.Namespace) -> int:
         or cfg.get("api_key")
         or os.environ.get("OPENROUTER_API_KEY")
         or os.environ.get("OPENAI_API_KEY")
+        or os.environ.get("DEEPSEEK_API_KEY")
+        or os.environ.get("GEMINI_API_KEY")
     )
+    if not key and sys.stdin.isatty():
+        print("[⚡ VOLT-AI] No provider API key detected.")
+        print("VOLT-AI operates on a Bring-Your-Own-Key (BYOK) model.")
+        try:
+            input_key = input("Enter your Provider API Key (OpenRouter, DeepSeek, Gemini, or OpenAI): ").strip()
+            if input_key:
+                key = input_key
+                cfg["api_key"] = key
+                save_config(cfg)
+                print(f"[+] Saved API key to configuration: {CONFIG_FILE}\n")
+        except (KeyboardInterrupt, EOFError):
+            print("\nOperation cancelled.")
+            return 1
     user = getattr(args, "user", None) or cfg.get("user") or "cli-coder"
     project = getattr(args, "project", None) or cfg.get("project") or "cli-code"
 
@@ -891,7 +909,22 @@ def cmd_chat(args: argparse.Namespace) -> int:
         or cfg.get("api_key")
         or os.environ.get("OPENROUTER_API_KEY")
         or os.environ.get("OPENAI_API_KEY")
+        or os.environ.get("DEEPSEEK_API_KEY")
+        or os.environ.get("GEMINI_API_KEY")
     )
+    if not key and sys.stdin.isatty():
+        print("[⚡ VOLT-AI] No provider API key detected.")
+        print("VOLT-AI operates on a Bring-Your-Own-Key (BYOK) model.")
+        try:
+            input_key = input("Enter your Provider API Key (OpenRouter, DeepSeek, Gemini, or OpenAI): ").strip()
+            if input_key:
+                key = input_key
+                cfg["api_key"] = key
+                save_config(cfg)
+                print(f"[+] Saved API key to configuration: {CONFIG_FILE}\n")
+        except (KeyboardInterrupt, EOFError):
+            print("\nOperation cancelled.")
+            return 1
     user = getattr(args, "user", None) or cfg.get("user") or "cli-chat"
     project = getattr(args, "project", None) or cfg.get("project") or "cli-chat"
 
