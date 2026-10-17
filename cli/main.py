@@ -344,8 +344,8 @@ def cmd_test(args: argparse.Namespace) -> int:
     server = (args.server or get_server_url(cfg)).rstrip("/")
     key = args.key or cfg.get("api_key") or os.environ.get("OPENAI_API_KEY")
     if not key:
-        print("[!] Note: No personal API key found in ~/.ai-observer/config.json.")
-        print("    If BYOK is enabled on the server, please set your Gemini key via 'observer activate', or pass --key <KEY>.")
+        print("[!] Note: No personal API key found in ~/.volt-ai/config.json.")
+        print("    If BYOK is enabled on the server, please set your provider API key via 'volt activate', or pass --key <KEY>.")
         key = "test-key"
     user = args.user or cfg.get("user") or "cli-tester"
     project = args.project or cfg.get("project") or "test-project"
