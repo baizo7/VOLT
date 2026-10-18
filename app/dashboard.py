@@ -80,6 +80,10 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         <span>Google Sign In</span>
       </a>
 
+      <a href="/docs" target="_blank" class="px-2.5 py-1.5 text-[11px] font-medium bg-surface-800 hover:bg-surface-700 text-slate-300 rounded-lg border border-surface-700 transition flex items-center gap-1">
+        <span>📖 Docs</span>
+      </a>
+
       <span id="health-badge" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-950/60 text-emerald-400 border border-emerald-800/50">
         <span class="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse"></span>Connecting
       </span>

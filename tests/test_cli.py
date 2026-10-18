@@ -375,3 +375,17 @@ def test_cmd_usage_all_with_token(capsys):
     assert "Developer: Entire Team" in out
 
 
+def test_cmd_docs(capsys):
+    from cli.main import cmd_docs
+    mock_args = MagicMock()
+    mock_args.server = "https://custom-server.com"
+
+    with patch("webbrowser.open") as mock_open:
+        ret = cmd_docs(mock_args)
+        assert ret == 0
+        mock_open.assert_called_once_with("https://custom-server.com/docs")
+    out = capsys.readouterr().out
+    assert "[+] Opening VOLT-AI Documentation: https://custom-server.com/docs" in out
+
+
+

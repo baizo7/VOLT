@@ -17,6 +17,24 @@ async def test_dashboard_and_root_view(async_client):
 
 
 @pytest.mark.asyncio
+async def test_docs_and_install_view(async_client, monkeypatch):
+    """Verify that /docs and /install are public, accessible without auth, and return rich guides."""
+    monkeypatch.setenv("OBSERVER_AUTH_TOKEN", "secure-token")
+
+    resp_docs = await async_client.get("/docs")
+    assert resp_docs.status_code == 200
+    assert "VOLT-AI" in resp_docs.text
+    assert "Documentation & Installation Guide" in resp_docs.text
+    assert "pip install volt-ai" in resp_docs.text
+    assert "fast_coder" in resp_docs.text
+
+    resp_install = await async_client.get("/install")
+    assert resp_install.status_code == 200
+    assert "VOLT-AI" in resp_install.text
+    assert "pip install volt-ai" in resp_install.text
+
+
+@pytest.mark.asyncio
 async def test_dashboard_with_auth(async_client, monkeypatch):
     monkeypatch.setenv("OBSERVER_AUTH_TOKEN", "secure-token")
 

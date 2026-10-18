@@ -338,6 +338,19 @@ def cmd_dashboard(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_docs(args: argparse.Namespace) -> int:
+    """Open the web documentation & installation guide in default browser."""
+    cfg = load_config()
+    server = (getattr(args, "server", None) or get_server_url(cfg)).rstrip("/")
+    url = f"{server}/docs"
+    print(f"[+] Opening VOLT-AI Documentation: {url}")
+    try:
+        webbrowser.open(url)
+    except Exception as exc:
+        print(f"Could not open browser automatically: {exc}. Please visit: {url}")
+    return 0
+
+
 def cmd_test(args: argparse.Namespace) -> int:
     """Send a minimal test request to verify end-to-end proxy connectivity."""
     cfg = load_config()
@@ -1116,6 +1129,10 @@ def main() -> int:
     p_dash.add_argument("--admin", action="store_true", help="Open in Admin mode with full system visibility")
     p_dash.add_argument("--token", help="Admin secret token")
 
+    # docs / install
+    p_docs = subparsers.add_parser("docs", aliases=["install"], help="Open public documentation & installation guide in browser")
+    p_docs.add_argument("--server", help="VOLT-AI server URL")
+
     # test
     p_test = subparsers.add_parser("test", help="Test connection and model response through proxy")
     p_test.add_argument("--server", help="VOLT-AI server URL")
@@ -1149,6 +1166,8 @@ def main() -> int:
         return cmd_usage(args)
     elif args.subcommand == "dashboard":
         return cmd_dashboard(args)
+    elif args.subcommand in ("docs", "install"):
+        return cmd_docs(args)
     elif args.subcommand == "test":
         return cmd_test(args)
     elif args.subcommand == "env":

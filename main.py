@@ -14,6 +14,7 @@ Endpoints:
   GET  /tasks                     Recent tasks list and status
   GET  /tasks/{task_id}           Full audit trace for a specific task
   GET  /dashboard, GET /          Interactive analytics dashboard
+  GET  /docs, GET /install        Public documentation and installation guide
   POST /admin/prune               Retention policy cleanup
   POST /knowledge/solutions       Index verified solution (pgvector)
   POST /knowledge/search          Retrieve similar past solutions (semantic search)
@@ -51,6 +52,7 @@ from app.config import (
     logger,
 )
 from app.dashboard import DASHBOARD_HTML
+from app.docs import DOCS_HTML
 from app.login import get_login_html
 from app.dataset import (
     compute_dataset_summary,
@@ -353,7 +355,7 @@ async def custom_rate_limit_handler(request: Request, exc: RateLimitExceeded) ->
 
 
 limiter = Limiter(key_func=get_rate_limit_key)
-app = FastAPI(title="AI Model Observer", lifespan=lifespan)
+app = FastAPI(title="VOLT-AI", docs_url="/api/docs", redoc_url="/api/redoc", lifespan=lifespan)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, custom_rate_limit_handler)
 app.add_middleware(SlowAPIMiddleware)
@@ -1868,6 +1870,14 @@ async def root_view(request: Request):
             return RedirectResponse(url="/login", status_code=302)
         return JSONResponse({"error": "unauthorized"}, status_code=401)
     return HTMLResponse(content=DASHBOARD_HTML)
+
+
+# ---------- public documentation & installation guide ----------
+@app.get("/docs", response_class=HTMLResponse)
+@app.get("/install", response_class=HTMLResponse)
+async def docs_view(request: Request):
+    """Render public-facing documentation and installation web portal."""
+    return HTMLResponse(content=DOCS_HTML)
 
 
 # ---------- google oauth & account management endpoints ----------

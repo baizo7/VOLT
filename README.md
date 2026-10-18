@@ -116,6 +116,7 @@ The `volt` CLI provides comprehensive terminal commands:
 | `volt test` | Send a ping health check through the proxy | `volt test` |
 | `volt usage` | Inspect personal token consumption and request stats | `volt usage` |
 | `volt dashboard` | Open the real-time glassmorphism web dashboard | `volt dashboard` |
+| `volt docs` | Open the web documentation & installation guide in browser | `volt docs` (or `volt install`) |
 | `volt env` | Print shell export statements for `OPENAI_BASE_URL` | `volt env --shell powershell` |
 
 ---
@@ -199,6 +200,7 @@ Specify either:
 ## 📊 Live Observability & Cloud Service
 
 - **Central Server**: `https://volt-ai-lmgz.onrender.com`
+- **Documentation & Installation Portal**: `https://volt-ai-lmgz.onrender.com/docs` (or `/install`)
 - **Google Sign-In & Login Portal**: `https://volt-ai-lmgz.onrender.com/login`
 - **Interactive Dashboard**: `https://volt-ai-lmgz.onrender.com/dashboard`
 - **Health Check**: `https://volt-ai-lmgz.onrender.com/health`
@@ -211,7 +213,7 @@ Specify either:
 Run the full automated test suite:
 
 ```bash
-# Run unit & API test suite (179 tests passing, 0 warnings)
+# Run unit & API test suite (181 tests passing, 0 warnings)
 pytest -m "not integration"
 ```
 
