@@ -118,7 +118,7 @@
             <h2 class="text-base font-bold text-white flex items-center gap-2">
               <span>Enter Coding Task or Architecture Prompt</span>
             </h2>
-            <span class="text-[11px] text-slate-400">Heuristic Intent Parser</span>
+            <span class="text-[11px] text-slate-400">Local Heuristic Preview — Backend Is Authoritative</span>
           </div>
 
           <textarea id="router-input" rows="5" class="w-full bg-surface-950/90 border border-surface-700 rounded-xl p-3.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-400 mono leading-relaxed" placeholder="e.g. Write an async FastAPI streaming proxy with backpressure and circuit breakers..."></textarea>
@@ -162,8 +162,8 @@
                 <span id="route-complexity" class="text-lg font-black text-amber-400">Low (Tactical)</span>
               </div>
               <div class="p-3 rounded-xl bg-surface-900 border border-surface-700">
-                <span class="text-[10px] text-slate-400 uppercase font-semibold block">Estimated Latency</span>
-                <span id="route-latency" class="text-lg font-black text-emerald-400">~220 ms</span>
+                <span class="text-[10px] text-slate-400 uppercase font-semibold block">Live API Latency</span>
+                <span id="route-latency" class="text-lg font-black text-emerald-400">Run a live request</span>
               </div>
             </div>
 
@@ -177,7 +177,7 @@
             <div class="pt-2 border-t border-surface-800 flex items-center justify-between text-xs text-slate-400">
               <span>Two-Pass Reasoning:</span>
               <span class="text-emerald-400 font-semibold flex items-center gap-1">
-                <span>Pass 1: Fast Gen</span> &rarr; <span>Pass 2: QA Audit</span>
+                <span>Route-dependent coordination</span>
               </span>
             </div>
           </div>
@@ -203,7 +203,7 @@
               <option value="sim">Local UI Simulation (No API Call)</option>
             </select>
             <button onclick="runStudioGeneration()" class="px-4 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-md transition flex items-center gap-1.5">
-              <span>⚡ Run Dual-Pass</span>
+              <span>⚡ Run VOLT</span>
             </button>
           </div>
         </div>
@@ -284,7 +284,7 @@
 
         <div class="p-3.5 rounded-xl bg-surface-900 border border-surface-700 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-400">
           <span>Protected Patterns: OpenAI Keys, Anthropic Keys, AWS Access & Secret Keys, GitHub PATs, Bearer Auth, RSA Private Keys.</span>
-          <span class="text-amber-400 font-bold">100% Zero-Leak Guarantee</span>
+          <span class="text-amber-400 font-bold">Pattern-based demo — not a security guarantee</span>
         </div>
       </div>
     </div>
@@ -435,7 +435,7 @@
         <span>Hugging Face Space &bull; Static Web SDK</span>
       </div>
       <div>
-        <span>Author: <a href="https://huggingface.co/baizo" class="text-slate-300 hover:text-white font-semibold">baizo</a> (S Sanjai) &bull; Apache 2.0</span>
+        <span>Author: <a href="https://huggingface.co/baizo" class="text-slate-300 hover:text-white font-semibold">baizo</a> (S Sanjai) &bull; Model: Apache 2.0 &bull; Platform: Proprietary</span>
       </div>
     </div>
   </footer>
@@ -473,40 +473,40 @@
     function analyzeRouting() {
       const text = (document.getElementById('router-input').value || '').toLowerCase();
       let specialist = 'fast_coder';
-      let modelName = 'Qwen2.5-Coder-7B-Instruct';
-      let desc = 'Specialized in single-file tactical programming, fast syntax completion, and unit test generation.';
+      let modelName = 'Model resolved by backend routes.json';
+      let desc = 'Local prompt heuristic only. The actual model and specialist selection are returned by the VOLT backend after a live API request.';
       let complexity = 'Low (Tactical)';
-      let latency = '~220 ms';
-      let rationale = 'Query contains concise tactical code matching the fast_coder track for minimal latency.';
+      let latency = 'Measured on live request';
+      let rationale = 'Local heuristic preview only. Run a live request to see the backend decision and measured latency.';
 
       if (text.includes('architecture') || text.includes('microservice') || text.includes('distributed') || text.includes('kafka') || text.includes('refactor') || text.length > 300) {
         specialist = 'heavy_coder';
-        modelName = 'Claude 3.5 Sonnet / GPT-4o';
-        desc = 'Multi-file software architecture, refactoring, full system design, and typing hierarchies.';
+        modelName = 'Model resolved by backend routes.json';
+        desc = 'This local preview detected architecture-like language. The backend response is authoritative for actual routing.';
         complexity = 'High (Systemic)';
-        latency = '~1,100 ms';
-        rationale = 'Query requires high-level system design and multi-component coordination, routing to heavy_coder.';
+        latency = 'Measured on live request';
+        rationale = 'The local preview found architecture-related keywords. Confirm the actual track in the live response metadata.';
       } else if (text.includes('prove') || text.includes('math') || text.includes('theorem') || text.includes('matrix') || text.includes('equation')) {
         specialist = 'math_specialist';
-        modelName = 'Qwen2.5-Math-7B-Base';
-        desc = 'LaTeX proofs, numerical simulations, and asymptotic complexity analysis.';
+        modelName = 'Model resolved by backend routes.json';
+        desc = 'This local preview detected math-like language. The backend response is authoritative for actual routing.';
         complexity = 'High (Mathematical)';
-        latency = '~350 ms';
-        rationale = 'Detected formal proofs, numerical theorems, or symbolic compute, routing to math_specialist.';
+        latency = 'Measured on live request';
+        rationale = 'The local preview found math-related keywords. Confirm the actual track in the live response metadata.';
       } else if (text.includes('screenshot') || text.includes('ui') || text.includes('wireframe') || text.includes('mockup') || text.includes('image')) {
         specialist = 'vision_specialist';
-        modelName = 'Qwen2-VL-7B-Instruct';
-        desc = 'Multimodal comprehension and UI-to-code synthesis.';
+        modelName = 'Model resolved by backend routes.json';
+        desc = 'This local preview detected vision-related keywords. The backend requires an actual image input to select the vision track.';
         complexity = 'Medium (Multimodal)';
-        latency = '~650 ms';
-        rationale = 'Visual UI or wireframe elements detected, routing to multimodal vision_specialist.';
+        latency = 'Measured on live request';
+        rationale = 'Keywords alone do not attach an image. Actual vision routing requires an image in the API request.';
       } else if (text.includes('edge case') || text.includes('deadlock') || text.includes('formal') || text.includes('verify')) {
         specialist = 'deep_reasoner';
-        modelName = 'DeepSeek-R1 / OpenAI o1';
-        desc = 'Exhaustive chain-of-thought verification for hard algorithmic puzzles.';
+        modelName = 'Model resolved by backend routes.json';
+        desc = 'This local preview detected reasoning-like language. The backend response is authoritative for actual routing.';
         complexity = 'Critical (Reasoning)';
-        latency = '~2,400 ms';
-        rationale = 'Algorithmic edge cases and rigorous formal constraints route to deep_reasoner.';
+        latency = 'Measured on live request';
+        rationale = 'The local preview found reasoning-related keywords. Confirm the actual track in the live response metadata.';
       }
 
       document.getElementById('route-badge').innerText = specialist;
@@ -655,8 +655,15 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.secret`;
       scrubInput();
     }
 
+    function escapeHtml(value) {
+      return value.replace(/[&<>"']/g, (char) => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[char]));
+    }
+
     function scrubInput() {
-      let raw = document.getElementById('redactor-input').value;
+      // Escape user-supplied text before inserting markup for highlighted matches.
+      let raw = escapeHtml(document.getElementById('redactor-input').value);
       let count = 0;
       SECRET_PATTERNS.forEach(pat => {
         const matches = raw.match(pat.re);
