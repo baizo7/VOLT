@@ -297,15 +297,15 @@
         <div class="glass-card p-5 rounded-2xl space-y-3">
           <div class="flex items-center justify-between">
             <span class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">fast_coder</span>
-            <span class="text-xs font-black text-emerald-400">88.4% HumanEval</span>
+            <span class="text-xs font-black text-emerald-400">Local-first · Cloud fallback</span>
           </div>
-          <h3 class="text-base font-bold text-white">Qwen2.5-Coder-7B-Instruct</h3>
+          <h3 class="text-base font-bold text-white">Qwen2.5-Coder 1.5B (local)</h3>
           <p class="text-xs text-slate-400 leading-relaxed">
-            Ultra-low latency tactical programming, syntax generation, and rapid bugfixes with 32k context.
+            Fast code generation and syntax synthesis. Configured fallback candidates include Qwen2.5-Coder 32B and provider-specific options.
           </p>
           <div class="pt-2 border-t border-surface-700/60 flex items-center justify-between text-[11px] text-slate-400">
-            <span>Avg Latency: <strong>~220 ms</strong></span>
-            <span>Cost: <strong>$0.00 / Free</strong></span>
+            <span>Performance: <strong>Measure with benchmark runner</strong></span>
+            <span>Cost: <strong>Provider-dependent</strong></span>
           </div>
         </div>
 
@@ -313,15 +313,15 @@
         <div class="glass-card p-5 rounded-2xl space-y-3">
           <div class="flex items-center justify-between">
             <span class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">heavy_coder</span>
-            <span class="text-xs font-black text-indigo-400">93.7% HumanEval</span>
+            <span class="text-xs font-black text-indigo-400">Local-first · Cloud fallback</span>
           </div>
-          <h3 class="text-base font-bold text-white">Claude 3.5 Sonnet / GPT-4o</h3>
+          <h3 class="text-base font-bold text-white">Qwen2.5-Coder 7B (local)</h3>
           <p class="text-xs text-slate-400 leading-relaxed">
-            Multi-file software architecture, refactoring, full system design, and complex typing hierarchies.
+            Complex systems refactoring and multi-file coding. Configured fallback candidates include Qwen2.5-Coder 32B and provider-specific options.
           </p>
           <div class="pt-2 border-t border-surface-700/60 flex items-center justify-between text-[11px] text-slate-400">
-            <span>Avg Latency: <strong>~1,100 ms</strong></span>
-            <span>Cost: <strong>BYOK / Portal</strong></span>
+            <span>Performance: <strong>Measure with benchmark runner</strong></span>
+            <span>Cost: <strong>Provider-dependent</strong></span>
           </div>
         </div>
 
@@ -329,14 +329,14 @@
         <div class="glass-card p-5 rounded-2xl space-y-3">
           <div class="flex items-center justify-between">
             <span class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-violet-500/20 text-violet-300 border border-violet-500/30">deep_reasoner</span>
-            <span class="text-xs font-black text-violet-400">94.8% Math500</span>
+            <span class="text-xs font-black text-violet-400">Reasoning track</span>
           </div>
-          <h3 class="text-base font-bold text-white">DeepSeek-R1 / OpenAI o1</h3>
+          <h3 class="text-base font-bold text-white">DeepSeek-R1 7B (local)</h3>
           <p class="text-xs text-slate-400 leading-relaxed">
-            Exhaustive chain-of-thought verification for hard algorithmic puzzles, deadlock analysis, and logic proofs.
+            Step-by-step reasoning and algorithm design. Configured fallback candidates include DeepSeek Reasoner and other provider routes.
           </p>
           <div class="pt-2 border-t border-surface-700/60 flex items-center justify-between text-[11px] text-slate-400">
-            <span>Avg Latency: <strong>~2,400 ms</strong></span>
+            <span>Performance: <strong>Measure with benchmark runner</strong></span>
             <span>Cost: <strong>BYOK / Portal</strong></span>
           </div>
         </div>
@@ -345,14 +345,14 @@
         <div class="glass-card p-5 rounded-2xl space-y-3">
           <div class="flex items-center justify-between">
             <span class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">math_specialist</span>
-            <span class="text-xs font-black text-cyan-400">92.2% GSM8K</span>
+            <span class="text-xs font-black text-cyan-400">Math routing</span>
           </div>
-          <h3 class="text-base font-bold text-white">Qwen2.5-Math-7B-Base</h3>
+          <h3 class="text-base font-bold text-white">Qwen2.5-Math 7B (local)</h3>
           <p class="text-xs text-slate-400 leading-relaxed">
-            LaTeX proofs, numerical simulations, symbolic algebra, and algorithmic asymptotic complexity analysis.
+            Mathematical proofs, numerical formulas and algorithmic proofs. The configured fallback chain is selected by the coordinator.
           </p>
           <div class="pt-2 border-t border-surface-700/60 flex items-center justify-between text-[11px] text-slate-400">
-            <span>Avg Latency: <strong>~350 ms</strong></span>
+            <span>Performance: <strong>Measure with benchmark runner</strong></span>
             <span>Cost: <strong>$0.00 / Free</strong></span>
           </div>
         </div>
@@ -361,14 +361,14 @@
         <div class="glass-card p-5 rounded-2xl space-y-3">
           <div class="flex items-center justify-between">
             <span class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-pink-500/20 text-pink-300 border border-pink-500/30">vision_specialist</span>
-            <span class="text-xs font-black text-pink-400">86.1% DocVQA</span>
+            <span class="text-xs font-black text-pink-400">Vision routing</span>
           </div>
-          <h3 class="text-base font-bold text-white">Qwen2-VL-7B-Instruct</h3>
+          <h3 class="text-base font-bold text-white">Qwen2-VL 7B (local)</h3>
           <p class="text-xs text-slate-400 leading-relaxed">
-            Multimodal comprehension, converting wireframes, diagrams, and architecture sketches into frontend code.
+            UI screenshot analysis and visual inspection. The configured fallback chain includes Qwen2-VL 72B and provider-specific options.
           </p>
           <div class="pt-2 border-t border-surface-700/60 flex items-center justify-between text-[11px] text-slate-400">
-            <span>Avg Latency: <strong>~650 ms</strong></span>
+            <span>Performance: <strong>Measure with benchmark runner</strong></span>
             <span>Cost: <strong>$0.00 / Free</strong></span>
           </div>
         </div>
