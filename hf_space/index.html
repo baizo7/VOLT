@@ -118,7 +118,7 @@
             <h2 class="text-base font-bold text-white flex items-center gap-2">
               <span>Enter Coding Task or Architecture Prompt</span>
             </h2>
-            <span class="text-[11px] text-slate-400">Heuristic Intent Parser</span>
+            <span class="text-[11px] text-slate-400">Local Heuristic Preview — Backend Is Authoritative</span>
           </div>
 
           <textarea id="router-input" rows="5" class="w-full bg-surface-950/90 border border-surface-700 rounded-xl p-3.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-400 mono leading-relaxed" placeholder="e.g. Write an async FastAPI streaming proxy with backpressure and circuit breakers..."></textarea>
@@ -162,8 +162,8 @@
                 <span id="route-complexity" class="text-lg font-black text-amber-400">Low (Tactical)</span>
               </div>
               <div class="p-3 rounded-xl bg-surface-900 border border-surface-700">
-                <span class="text-[10px] text-slate-400 uppercase font-semibold block">Estimated Latency</span>
-                <span id="route-latency" class="text-lg font-black text-emerald-400">~220 ms</span>
+                <span class="text-[10px] text-slate-400 uppercase font-semibold block">Live API Latency</span>
+                <span id="route-latency" class="text-lg font-black text-emerald-400">Run a live request</span>
               </div>
             </div>
 
@@ -177,7 +177,7 @@
             <div class="pt-2 border-t border-surface-800 flex items-center justify-between text-xs text-slate-400">
               <span>Two-Pass Reasoning:</span>
               <span class="text-emerald-400 font-semibold flex items-center gap-1">
-                <span>Pass 1: Fast Gen</span> &rarr; <span>Pass 2: QA Audit</span>
+                <span>Route-dependent coordination</span>
               </span>
             </div>
           </div>
@@ -192,26 +192,30 @@
         
         <div class="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-surface-700">
           <div>
-            <h2 class="text-lg font-bold text-white">Live Code Studio & Verification Audit</h2>
-            <p class="text-xs text-slate-400">Inspect Pass-1 generation alongside Pass-2 automated verification</p>
+            <h2 class="text-lg font-bold text-white">Live VOLT Playground</h2>
+            <p class="text-xs text-slate-400">Send the Router Lab prompt to the real VOLT API, or run the clearly labelled local UI simulation</p>
           </div>
           
           <div class="flex items-center gap-2">
             <select id="studio-mode-select" class="bg-surface-950 border border-surface-700 text-xs text-slate-300 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-amber-400">
-              <option value="sim">Standalone High-Fidelity Simulation</option>
-              <option value="live">Live VOLT Cloud Proxy API</option>
-              <option value="byok">Personal BYOK API Key</option>
+              <option value="live">VOLT API — Free Tier (Live)</option>
+              <option value="byok">VOLT API — Bring Your Own Key (Live)</option>
+              <option value="sim">Local UI Simulation (No API Call)</option>
             </select>
             <button onclick="runStudioGeneration()" class="px-4 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-md transition flex items-center gap-1.5">
-              <span>⚡ Run Dual-Pass</span>
+              <span>⚡ Run VOLT</span>
             </button>
           </div>
         </div>
 
         <div id="byok-key-input-container" class="hidden p-3 rounded-xl bg-surface-900 border border-surface-700 flex items-center gap-3">
           <span class="text-xs font-semibold text-slate-300">Your Provider Key:</span>
-          <input type="password" id="byok-key" class="flex-1 bg-surface-950 border border-surface-700 text-xs px-3 py-1.5 rounded-lg text-slate-200" placeholder="sk-..." />
-          <span class="text-[10px] text-slate-500">Stored only in your browser memory</span>
+          <input type="password" id="byok-key" autocomplete="off" class="flex-1 bg-surface-950 border border-surface-700 text-xs px-3 py-1.5 rounded-lg text-slate-200" placeholder="Your provider API key" />
+          <span class="text-[10px] text-slate-500">Used for this request only; not saved by this page</span>
+        </div>
+        <div class="rounded-xl bg-surface-900 border border-surface-700 p-3 flex flex-wrap items-center justify-between gap-2">
+          <p class="text-xs text-slate-400">Prompt source: <strong class="text-slate-200">Router Lab</strong> tab. Run a live request to see actual backend routing and token usage.</p>
+          <button type="button" onclick="switchTab('router')" class="text-xs font-bold text-amber-400 hover:text-amber-300">Open Router Lab →</button>
         </div>
 
         <!-- Studio Two-Column Grid: Pass 1 vs Pass 2 -->
@@ -222,15 +226,11 @@
             <div class="flex items-center justify-between px-1">
               <span class="text-xs font-bold text-indigo-400 flex items-center gap-1.5">
                 <span class="h-2 w-2 rounded-full bg-indigo-400"></span>
-                <span>Pass 1: Specialist Candidate Generation</span>
+                <span>Actual VOLT API Response</span>
               </span>
-              <span id="pass1-time" class="text-[11px] text-slate-500">184 ms</span>
+              <span id="pass1-time" class="text-[11px] text-slate-500">—</span>
             </div>
-            <pre><code id="pass1-code" class="language-python"># Pass 1 candidate implementation will generate here...
-async def stream_data(endpoint: str):
-    async with httpx.AsyncClient() as client:
-        response = await client.get(endpoint)
-        return response.json()</code></pre>
+            <pre><code id="pass1-code" class="language-python">Enter a prompt in the Router Lab tab, then choose a live mode and click Run VOLT.</code></pre>
           </div>
 
           <!-- Pass 2 Column -->
@@ -238,20 +238,11 @@ async def stream_data(endpoint: str):
             <div class="flex items-center justify-between px-1">
               <span class="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
                 <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
-                <span>Pass 2: Reasoning & Edge-Case Audit</span>
+                <span>Backend Routing & Usage Metadata</span>
               </span>
-              <span id="pass2-status" class="text-[11px] text-emerald-400 font-semibold">Verified PASS</span>
+              <span id="pass2-status" class="text-[11px] text-slate-500 font-semibold">Awaiting request</span>
             </div>
-            <pre><code id="pass2-code" class="language-python"># Pass 2 verifies error handling, timeout leaks, and typed schemas:
-async def stream_data(endpoint: str, timeout_sec: float = 10.0) -> dict:
-    try:
-        async with httpx.AsyncClient(timeout=timeout_sec) as client:
-            response = await client.get(endpoint)
-            response.raise_for_status()
-            return response.json()
-    except httpx.HTTPError as exc:
-        logger.error(f"Upstream request failure: {exc}")
-        raise ServiceUnavailableError("Upstream service unreachable")</code></pre>
+            <pre><code id="pass2-code" class="language-python">Actual track, specialist identifiers, routing reason, measured latency and API token usage will appear here after a live request.</code></pre>
           </div>
 
         </div>
@@ -293,7 +284,7 @@ async def stream_data(endpoint: str, timeout_sec: float = 10.0) -> dict:
 
         <div class="p-3.5 rounded-xl bg-surface-900 border border-surface-700 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-400">
           <span>Protected Patterns: OpenAI Keys, Anthropic Keys, AWS Access & Secret Keys, GitHub PATs, Bearer Auth, RSA Private Keys.</span>
-          <span class="text-amber-400 font-bold">100% Zero-Leak Guarantee</span>
+          <span class="text-amber-400 font-bold">Pattern-based demo — not a security guarantee</span>
         </div>
       </div>
     </div>
@@ -306,15 +297,15 @@ async def stream_data(endpoint: str, timeout_sec: float = 10.0) -> dict:
         <div class="glass-card p-5 rounded-2xl space-y-3">
           <div class="flex items-center justify-between">
             <span class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">fast_coder</span>
-            <span class="text-xs font-black text-emerald-400">88.4% HumanEval</span>
+            <span class="text-xs font-black text-emerald-400">Local-first · Cloud fallback</span>
           </div>
-          <h3 class="text-base font-bold text-white">Qwen2.5-Coder-7B-Instruct</h3>
+          <h3 class="text-base font-bold text-white">Qwen2.5-Coder 1.5B (local)</h3>
           <p class="text-xs text-slate-400 leading-relaxed">
-            Ultra-low latency tactical programming, syntax generation, and rapid bugfixes with 32k context.
+            Fast code generation and syntax synthesis. Configured fallback candidates include Qwen2.5-Coder 32B and provider-specific options.
           </p>
           <div class="pt-2 border-t border-surface-700/60 flex items-center justify-between text-[11px] text-slate-400">
-            <span>Avg Latency: <strong>~220 ms</strong></span>
-            <span>Cost: <strong>$0.00 / Free</strong></span>
+            <span>Performance: <strong>Measure with benchmark runner</strong></span>
+            <span>Cost: <strong>Provider-dependent</strong></span>
           </div>
         </div>
 
@@ -322,15 +313,15 @@ async def stream_data(endpoint: str, timeout_sec: float = 10.0) -> dict:
         <div class="glass-card p-5 rounded-2xl space-y-3">
           <div class="flex items-center justify-between">
             <span class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">heavy_coder</span>
-            <span class="text-xs font-black text-indigo-400">93.7% HumanEval</span>
+            <span class="text-xs font-black text-indigo-400">Local-first · Cloud fallback</span>
           </div>
-          <h3 class="text-base font-bold text-white">Claude 3.5 Sonnet / GPT-4o</h3>
+          <h3 class="text-base font-bold text-white">Qwen2.5-Coder 7B (local)</h3>
           <p class="text-xs text-slate-400 leading-relaxed">
-            Multi-file software architecture, refactoring, full system design, and complex typing hierarchies.
+            Complex systems refactoring and multi-file coding. Configured fallback candidates include Qwen2.5-Coder 32B and provider-specific options.
           </p>
           <div class="pt-2 border-t border-surface-700/60 flex items-center justify-between text-[11px] text-slate-400">
-            <span>Avg Latency: <strong>~1,100 ms</strong></span>
-            <span>Cost: <strong>BYOK / Portal</strong></span>
+            <span>Performance: <strong>Measure with benchmark runner</strong></span>
+            <span>Cost: <strong>Provider-dependent</strong></span>
           </div>
         </div>
 
@@ -338,14 +329,14 @@ async def stream_data(endpoint: str, timeout_sec: float = 10.0) -> dict:
         <div class="glass-card p-5 rounded-2xl space-y-3">
           <div class="flex items-center justify-between">
             <span class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-violet-500/20 text-violet-300 border border-violet-500/30">deep_reasoner</span>
-            <span class="text-xs font-black text-violet-400">94.8% Math500</span>
+            <span class="text-xs font-black text-violet-400">Reasoning track</span>
           </div>
-          <h3 class="text-base font-bold text-white">DeepSeek-R1 / OpenAI o1</h3>
+          <h3 class="text-base font-bold text-white">DeepSeek-R1 7B (local)</h3>
           <p class="text-xs text-slate-400 leading-relaxed">
-            Exhaustive chain-of-thought verification for hard algorithmic puzzles, deadlock analysis, and logic proofs.
+            Step-by-step reasoning and algorithm design. Configured fallback candidates include DeepSeek Reasoner and other provider routes.
           </p>
           <div class="pt-2 border-t border-surface-700/60 flex items-center justify-between text-[11px] text-slate-400">
-            <span>Avg Latency: <strong>~2,400 ms</strong></span>
+            <span>Performance: <strong>Measure with benchmark runner</strong></span>
             <span>Cost: <strong>BYOK / Portal</strong></span>
           </div>
         </div>
@@ -354,14 +345,14 @@ async def stream_data(endpoint: str, timeout_sec: float = 10.0) -> dict:
         <div class="glass-card p-5 rounded-2xl space-y-3">
           <div class="flex items-center justify-between">
             <span class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">math_specialist</span>
-            <span class="text-xs font-black text-cyan-400">92.2% GSM8K</span>
+            <span class="text-xs font-black text-cyan-400">Math routing</span>
           </div>
-          <h3 class="text-base font-bold text-white">Qwen2.5-Math-7B-Base</h3>
+          <h3 class="text-base font-bold text-white">Qwen2.5-Math 7B (local)</h3>
           <p class="text-xs text-slate-400 leading-relaxed">
-            LaTeX proofs, numerical simulations, symbolic algebra, and algorithmic asymptotic complexity analysis.
+            Mathematical proofs, numerical formulas and algorithmic proofs. The configured fallback chain is selected by the coordinator.
           </p>
           <div class="pt-2 border-t border-surface-700/60 flex items-center justify-between text-[11px] text-slate-400">
-            <span>Avg Latency: <strong>~350 ms</strong></span>
+            <span>Performance: <strong>Measure with benchmark runner</strong></span>
             <span>Cost: <strong>$0.00 / Free</strong></span>
           </div>
         </div>
@@ -370,14 +361,14 @@ async def stream_data(endpoint: str, timeout_sec: float = 10.0) -> dict:
         <div class="glass-card p-5 rounded-2xl space-y-3">
           <div class="flex items-center justify-between">
             <span class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-pink-500/20 text-pink-300 border border-pink-500/30">vision_specialist</span>
-            <span class="text-xs font-black text-pink-400">86.1% DocVQA</span>
+            <span class="text-xs font-black text-pink-400">Vision routing</span>
           </div>
-          <h3 class="text-base font-bold text-white">Qwen2-VL-7B-Instruct</h3>
+          <h3 class="text-base font-bold text-white">Qwen2-VL 7B (local)</h3>
           <p class="text-xs text-slate-400 leading-relaxed">
-            Multimodal comprehension, converting wireframes, diagrams, and architecture sketches into frontend code.
+            UI screenshot analysis and visual inspection. The configured fallback chain includes Qwen2-VL 72B and provider-specific options.
           </p>
           <div class="pt-2 border-t border-surface-700/60 flex items-center justify-between text-[11px] text-slate-400">
-            <span>Avg Latency: <strong>~650 ms</strong></span>
+            <span>Performance: <strong>Measure with benchmark runner</strong></span>
             <span>Cost: <strong>$0.00 / Free</strong></span>
           </div>
         </div>
@@ -444,7 +435,7 @@ async def stream_data(endpoint: str, timeout_sec: float = 10.0) -> dict:
         <span>Hugging Face Space &bull; Static Web SDK</span>
       </div>
       <div>
-        <span>Author: <a href="https://huggingface.co/baizo" class="text-slate-300 hover:text-white font-semibold">baizo</a> (S Sanjai) &bull; Apache 2.0</span>
+        <span>Author: <a href="https://huggingface.co/baizo" class="text-slate-300 hover:text-white font-semibold">baizo</a> (S Sanjai) &bull; Model: Apache 2.0 &bull; Platform: Proprietary</span>
       </div>
     </div>
   </footer>
@@ -482,40 +473,40 @@ async def stream_data(endpoint: str, timeout_sec: float = 10.0) -> dict:
     function analyzeRouting() {
       const text = (document.getElementById('router-input').value || '').toLowerCase();
       let specialist = 'fast_coder';
-      let modelName = 'Qwen2.5-Coder-7B-Instruct';
-      let desc = 'Specialized in single-file tactical programming, fast syntax completion, and unit test generation.';
+      let modelName = 'Model resolved by backend routes.json';
+      let desc = 'Local prompt heuristic only. The actual model and specialist selection are returned by the VOLT backend after a live API request.';
       let complexity = 'Low (Tactical)';
-      let latency = '~220 ms';
-      let rationale = 'Query contains concise tactical code matching the fast_coder track for minimal latency.';
+      let latency = 'Measured on live request';
+      let rationale = 'Local heuristic preview only. Run a live request to see the backend decision and measured latency.';
 
       if (text.includes('architecture') || text.includes('microservice') || text.includes('distributed') || text.includes('kafka') || text.includes('refactor') || text.length > 300) {
         specialist = 'heavy_coder';
-        modelName = 'Claude 3.5 Sonnet / GPT-4o';
-        desc = 'Multi-file software architecture, refactoring, full system design, and typing hierarchies.';
+        modelName = 'Model resolved by backend routes.json';
+        desc = 'This local preview detected architecture-like language. The backend response is authoritative for actual routing.';
         complexity = 'High (Systemic)';
-        latency = '~1,100 ms';
-        rationale = 'Query requires high-level system design and multi-component coordination, routing to heavy_coder.';
+        latency = 'Measured on live request';
+        rationale = 'The local preview found architecture-related keywords. Confirm the actual track in the live response metadata.';
       } else if (text.includes('prove') || text.includes('math') || text.includes('theorem') || text.includes('matrix') || text.includes('equation')) {
         specialist = 'math_specialist';
-        modelName = 'Qwen2.5-Math-7B-Base';
-        desc = 'LaTeX proofs, numerical simulations, and asymptotic complexity analysis.';
+        modelName = 'Model resolved by backend routes.json';
+        desc = 'This local preview detected math-like language. The backend response is authoritative for actual routing.';
         complexity = 'High (Mathematical)';
-        latency = '~350 ms';
-        rationale = 'Detected formal proofs, numerical theorems, or symbolic compute, routing to math_specialist.';
+        latency = 'Measured on live request';
+        rationale = 'The local preview found math-related keywords. Confirm the actual track in the live response metadata.';
       } else if (text.includes('screenshot') || text.includes('ui') || text.includes('wireframe') || text.includes('mockup') || text.includes('image')) {
         specialist = 'vision_specialist';
-        modelName = 'Qwen2-VL-7B-Instruct';
-        desc = 'Multimodal comprehension and UI-to-code synthesis.';
+        modelName = 'Model resolved by backend routes.json';
+        desc = 'This local preview detected vision-related keywords. The backend requires an actual image input to select the vision track.';
         complexity = 'Medium (Multimodal)';
-        latency = '~650 ms';
-        rationale = 'Visual UI or wireframe elements detected, routing to multimodal vision_specialist.';
+        latency = 'Measured on live request';
+        rationale = 'Keywords alone do not attach an image. Actual vision routing requires an image in the API request.';
       } else if (text.includes('edge case') || text.includes('deadlock') || text.includes('formal') || text.includes('verify')) {
         specialist = 'deep_reasoner';
-        modelName = 'DeepSeek-R1 / OpenAI o1';
-        desc = 'Exhaustive chain-of-thought verification for hard algorithmic puzzles.';
+        modelName = 'Model resolved by backend routes.json';
+        desc = 'This local preview detected reasoning-like language. The backend response is authoritative for actual routing.';
         complexity = 'Critical (Reasoning)';
-        latency = '~2,400 ms';
-        rationale = 'Algorithmic edge cases and rigorous formal constraints route to deep_reasoner.';
+        latency = 'Measured on live request';
+        rationale = 'The local preview found reasoning-related keywords. Confirm the actual track in the live response metadata.';
       }
 
       document.getElementById('route-badge').innerText = specialist;
@@ -527,38 +518,120 @@ async def stream_data(endpoint: str, timeout_sec: float = 10.0) -> dict:
     }
 
     // Studio Generation Simulation
-    function runStudioGeneration() {
+    async function runStudioGeneration() {
       const mode = document.getElementById('studio-mode-select').value;
       const pass1El = document.getElementById('pass1-code');
       const pass2El = document.getElementById('pass2-code');
+      const elapsedEl = document.getElementById('pass1-time');
+      const statusEl = document.getElementById('pass2-status');
+      const button = document.querySelector('button[onclick="runStudioGeneration()"]');
+      const prompt = (document.getElementById('router-input')?.value || '').trim();
 
-      pass1El.innerText = "# Streaming Pass 1 draft candidate...";
-      pass2El.innerText = "# Awaiting Pass 1 output for verification audit...";
+      if (!prompt) {
+        pass1El.textContent = 'Add a prompt in the Router Lab tab before running VOLT.';
+        pass2El.textContent = 'No request has been sent.';
+        switchTab('router');
+        return;
+      }
 
-      setTimeout(() => {
-        pass1El.innerText = `# [Pass 1 Generated by fast_coder]
-async def fetch_metrics(service_url: str):
-    async with httpx.AsyncClient() as client:
-        res = await client.get(service_url)
-        return res.json()`;
-        hljs.highlightElement(pass1El);
+      if (mode === 'sim') {
+        statusEl.textContent = 'Local simulation';
+        statusEl.className = 'text-[11px] text-amber-400 font-semibold';
+        elapsedEl.textContent = 'Not measured';
+        pass1El.textContent = '# LOCAL UI SIMULATION ONLY\n# No model API was called.\n\nThis mode is a visual demonstration, not a generated VOLT response.';
+        pass2El.textContent = JSON.stringify({
+          mode: 'simulation',
+          live_request: false,
+          note: 'Choose one of the live API modes to invoke the deployed VOLT backend.'
+        }, null, 2);
+        return;
+      }
 
-        setTimeout(() => {
-          pass2El.innerText = `# [Pass 2 Verified by VOLT QA Auditor]
-# Audit Findings: Added timeout handling & typed error models
-async def fetch_metrics(service_url: str, timeout_sec: float = 5.0) -> dict:
-    try:
-        async with httpx.AsyncClient(timeout=timeout_sec) as client:
-            res = await client.get(service_url)
-            res.raise_for_status()
-            return res.json()
-    except httpx.TimeoutException:
-        raise TimeoutError(f"Metrics collection timed out after {timeout_sec}s")
-    except httpx.HTTPError as exc:
-        raise RuntimeError(f"Upstream HTTP error: {exc}")`;
-          hljs.highlightElement(pass2El);
-        }, 500);
-      }, 400);
+      const apiUrl = 'https://volt-ai-lmgz.onrender.com/v1/chat/completions';
+      const headers = { 'Content-Type': 'application/json' };
+      if (mode === 'byok') {
+        const key = (document.getElementById('byok-key')?.value || '').trim();
+        if (!key) {
+          statusEl.textContent = 'API key required';
+          statusEl.className = 'text-[11px] text-rose-400 font-semibold';
+          pass1El.textContent = 'Enter your provider API key in the BYOK field.';
+          return;
+        }
+        headers.Authorization = 'Bearer ' + key;
+      }
+
+      const originalLabel = button ? button.textContent : '';
+      if (button) {
+        button.disabled = true;
+        button.textContent = 'Calling VOLT…';
+        button.classList.add('opacity-60', 'cursor-not-allowed');
+      }
+      statusEl.textContent = 'Request in progress';
+      statusEl.className = 'text-[11px] text-amber-400 font-semibold';
+      pass1El.textContent = 'Sending prompt to the deployed VOLT API…';
+      pass2El.textContent = 'Waiting for routing and token metadata…';
+      elapsedEl.textContent = 'Measuring…';
+
+      const started = performance.now();
+      try {
+        const response = await fetch(apiUrl, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            model: 'VOLT-AI',
+            messages: [{ role: 'user', content: prompt }],
+            stream: false
+          }),
+          signal: AbortSignal.timeout(180000)
+        });
+        const clientLatencyMs = Math.round(performance.now() - started);
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          const detail = payload?.error?.message || payload?.error || payload?.detail || response.statusText;
+          throw new Error('VOLT API ' + response.status + ': ' + String(detail));
+        }
+
+        const answer = payload?.choices?.[0]?.message?.content;
+        if (typeof answer !== 'string' || !answer.trim()) {
+          throw new Error('The API returned no assistant message.');
+        }
+        const coordination = payload.volt_coordination || payload.observer_coordination || {};
+        const usage = payload.usage || {};
+        pass1El.textContent = answer;
+        pass2El.textContent = JSON.stringify({
+          live_request: true,
+          model: payload.model || 'VOLT-AI',
+          track: coordination.track ?? null,
+          specialists_used: coordination.specialists_used ?? [],
+          routing_reason: coordination.reason ?? null,
+          has_reasoning_pass: coordination.has_reasoning_pass ?? null,
+          server_latency_ms: coordination.latency_ms ?? null,
+          client_observed_latency_ms: clientLatencyMs,
+          prompt_tokens: usage.prompt_tokens ?? null,
+          completion_tokens: usage.completion_tokens ?? null,
+          total_tokens: usage.total_tokens ?? null
+        }, null, 2);
+        elapsedEl.textContent = clientLatencyMs + ' ms client-observed';
+        statusEl.textContent = 'Live response received';
+        statusEl.className = 'text-[11px] text-emerald-400 font-semibold';
+      } catch (error) {
+        const message = error?.name === 'TimeoutError'
+          ? 'Request timed out after 180 seconds.'
+          : (error?.message || 'Unable to reach VOLT API.');
+        pass1El.textContent = 'Request failed: ' + message;
+        pass2El.textContent = 'No successful response metadata is available.';
+        elapsedEl.textContent = 'Failed';
+        statusEl.textContent = 'Request failed';
+        statusEl.className = 'text-[11px] text-rose-400 font-semibold';
+      } finally {
+        if (button) {
+          button.disabled = false;
+          button.textContent = originalLabel || '⚡ Run VOLT';
+          button.classList.remove('opacity-60', 'cursor-not-allowed');
+        }
+        const byokInput = document.getElementById('byok-key');
+        if (byokInput && mode === 'byok') byokInput.value = '';
+      }
     }
 
     // Secret Redaction Simulation
@@ -582,8 +655,15 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.secret`;
       scrubInput();
     }
 
+    function escapeHtml(value) {
+      return value.replace(/[&<>"']/g, (char) => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[char]));
+    }
+
     function scrubInput() {
-      let raw = document.getElementById('redactor-input').value;
+      // Escape user-supplied text before inserting markup for highlighted matches.
+      let raw = escapeHtml(document.getElementById('redactor-input').value);
       let count = 0;
       SECRET_PATTERNS.forEach(pat => {
         const matches = raw.match(pat.re);

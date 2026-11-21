@@ -254,8 +254,8 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       <span id="active-filter" class="text-[11px] text-indigo-400 font-medium cursor-pointer"></span>
     </div>
     <div class="overflow-x-auto"><table class="w-full text-left text-xs text-slate-300"><thead class="bg-surface-950/70 text-[10px] text-slate-500 border-b border-surface-700 uppercase">
-      <tr><th class="py-2 px-3.5">Model</th><th class="py-2 px-3.5">Calls</th><th class="py-2 px-3.5">Avg Latency</th><th class="py-2 px-3.5">In Tokens</th><th class="py-2 px-3.5">Out Tokens</th><th class="py-2 px-3.5">Pass / Fail</th><th class="py-2 px-3.5">Success</th><th class="py-2 px-3.5">Est. Cost</th></tr>
-    </thead><tbody id="models-body" class="divide-y divide-surface-700"><tr><td colspan="8" class="py-4 text-center text-slate-600 text-xs">Loading...</td></tr></tbody></table></div>
+      <tr><th class="py-2 px-3.5">Model</th><th class="py-2 px-3.5">Calls</th><th class="py-2 px-3.5">Avg Latency</th><th class="py-2 px-3.5">P50</th><th class="py-2 px-3.5">P95</th><th class="py-2 px-3.5">In Tokens</th><th class="py-2 px-3.5">Out Tokens</th><th class="py-2 px-3.5">Pass / Fail</th><th class="py-2 px-3.5">Success</th><th class="py-2 px-3.5">Est. Cost</th></tr>
+    </thead><tbody id="models-body" class="divide-y divide-surface-700"><tr><td colspan="10" class="py-4 text-center text-slate-600 text-xs">Loading...</td></tr></tbody></table></div>
   </section>
 </div>
 
@@ -828,7 +828,7 @@ async function fetchData() {
       renderStats(S.statsCache);
     } else if (sRes.status === 503) {
       const mb = document.getElementById('models-body');
-      if (mb) mb.innerHTML = '<tr><td colspan="8" class="py-6 text-center text-amber-400 text-xs">⚠️ Database is connecting. Run <code class="mono bg-surface-900 px-2 py-0.5 rounded border border-surface-700 text-cyan-300">docker compose up -d db</code> in terminal.</td></tr>';
+      if (mb) mb.innerHTML = '<tr><td colspan="10" class="py-6 text-center text-amber-400 text-xs">⚠️ Database is connecting. Run <code class="mono bg-surface-900 px-2 py-0.5 rounded border border-surface-700 text-cyan-300">docker compose up -d db</code> in terminal.</td></tr>';
     }
     const tRes = await fetch('/tasks'+tq, {headers:h});
     if (tRes.ok) {
@@ -937,7 +937,7 @@ function renderRegisteredUsers(users) {
 function renderStats(stats) {
   let tc=0,ti=0,to=0,tp=0,tf=0,tl=0,totalCost=0;
   const tb=document.getElementById('models-body');
-  if(!stats||!stats.length){tb.innerHTML='<tr><td colspan="8" class="py-6 text-center text-slate-600 text-xs">No data.</td></tr>';['total-calls','avg-latency','total-tokens','est-cost'].forEach(id=>document.getElementById(id).textContent='—');return;}
+  if(!stats||!stats.length){tb.innerHTML='<tr><td colspan="10" class="py-6 text-center text-slate-600 text-xs">No data.</td></tr>';['total-calls','avg-latency','total-tokens','est-cost'].forEach(id=>document.getElementById(id).textContent='—');return;}
   tb.innerHTML='';
   stats.forEach(m=>{
     tc+=m.calls||0; ti+=m.input_tokens||0; to+=m.output_tokens||0; tp+=m.passes||0; tf+=m.fails||0; tl+=(m.avg_latency_ms||0)*(m.calls||0);
@@ -947,7 +947,9 @@ function renderStats(stats) {
     const tr=document.createElement('tr'); tr.className='hover:bg-surface-800/40 transition';
     tr.innerHTML=`<td class="py-2.5 px-4 mono font-semibold text-slate-200 text-xs">${m.model}</td>
     <td class="py-2.5 px-4 font-bold text-white">${(m.calls||0).toLocaleString()}</td>
-    <td class="py-2.5 px-4 text-slate-400 text-xs">${m.avg_latency_ms?m.avg_latency_ms+'ms':'—'}</td>
+    <td class="py-2.5 px-4 text-slate-400 text-xs">${m.avg_latency_ms?Math.round(m.avg_latency_ms)+'ms':'—'}</td>
+    <td class="py-2.5 px-4 text-slate-500 text-[11px]">${m.p50_latency_ms!=null?Math.round(m.p50_latency_ms)+'ms':'—'}</td>
+    <td class="py-2.5 px-4 text-slate-500 text-[11px]">${m.p95_latency_ms!=null?Math.round(m.p95_latency_ms)+'ms':'—'}</td>
     <td class="py-2.5 px-4 text-slate-500 text-[11px]">${(m.input_tokens||0).toLocaleString()}</td>
     <td class="py-2.5 px-4 text-slate-500 text-[11px]">${(m.output_tokens||0).toLocaleString()}</td>
     <td class="py-2.5 px-4 text-xs"><span class="text-emerald-400 font-bold">${m.passes||0}</span><span class="text-slate-600 mx-0.5">/</span><span class="text-rose-400 font-bold">${m.fails||0}</span></td>

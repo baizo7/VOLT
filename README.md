@@ -240,3 +240,44 @@ Any application, research paper, derivative model, or service utilizing VOLT-AI 
 ```
 
 For licensing inquiries or commercial enterprise deployments, please contact the author via [GitHub](https://github.com/baizo7).
+
+
+---
+
+## 🧭 Client & Developer Portfolio
+
+Explore the implementation and verify VOLT with the live demo:
+
+- **[Try VOLT-AI Studio](https://huggingface.co/spaces/baizo/volt-ai-studio)** — interactive static Space with live API mode and routing metadata.
+- **[Architecture](docs/architecture.md)** — actual intent-routing tracks, specialist selection, fallback behavior, API surfaces, and security boundaries.
+- **[Developer Guide](docs/developer-guide.md)** — CLI installation, Python and cURL requests, response metadata, and safe credential handling.
+- **[Benchmark Methodology](docs/benchmarks.md)** — reproducible latency and token measurement; reports should be generated from real API runs.
+- **[API Swagger UI](https://volt-ai-lmgz.onrender.com/api/docs)** — interactive API schema (subject to deployment availability and authentication).
+
+### Performance reporting
+
+VOLT records operational telemetry in PostgreSQL and exposes authenticated usage analytics through the dashboard. Run `python benchmarks/benchmark_latency.py --help` to produce a local benchmark report using your own API credential. Results distinguish client-observed latency from server-reported coordination latency. No performance figures are advertised here without a dated, reproducible measurement.
+
+### Architecture at a glance
+
+```mermaid
+flowchart TD
+    A[Client / CLI / IDE] --> B[FastAPI proxy]
+    B --> C[Authentication and quotas]
+    C --> D[Intent analysis]
+    D --> E{Routing track}
+    E -->|Direct task| F[Fast Coder]
+    E -->|Reasoning / architecture| G[Deep Reasoner]
+    G --> H[Heavy Coder]
+    E -->|Math| I[Math Specialist]
+    E -->|Image input| J[Vision Specialist]
+    F --> K[Response assembly]
+    H --> K
+    I --> K
+    J --> K
+    K --> L[OpenAI-compatible response]
+    K --> M[Scrubbed PostgreSQL telemetry]
+```
+
+The diagram summarizes supported routing behavior. Actual specialist/model mapping and fallbacks depend on the configured routes and are documented in [docs/architecture.md](docs/architecture.md).
+
