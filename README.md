@@ -7,8 +7,9 @@
 [![Model License: Apache 2.0](https://img.shields.io/badge/Model%20License-Apache%202.0%20%28Open%20Source%29-green.svg)](LICENSE)
 [![Platform License: Proprietary](https://img.shields.io/badge/Platform%20License-Proprietary%20%2F%20Source--Available-red.svg)](LICENSE)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/)
-[![Tests](https://img.shields.io/badge/tests-179%20passed%20%28100%25%29-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/tests-181%20passed%20%28100%25%29-brightgreen.svg)]()
 [![Cloud Endpoint](https://img.shields.io/badge/Render-Live%20Endpoint-46E3B7.svg)](https://volt-ai-lmgz.onrender.com)
+[![Hugging Face Spaces](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Spaces%20Demo-blue)](https://huggingface.co/spaces/baizo/volt-ai-studio)
 [![BYOK Architecture](https://img.shields.io/badge/Access-Bring--Your--Own--Key%20%28BYOK%29-orange.svg)]()
 
 ---
@@ -199,6 +200,7 @@ Specify either:
 
 ## 📊 Live Observability & Cloud Service
 
+- **Hugging Face Space Demo**: [https://huggingface.co/spaces/baizo/volt-ai-studio](https://huggingface.co/spaces/baizo/volt-ai-studio)
 - **Central Server**: `https://volt-ai-lmgz.onrender.com`
 - **Documentation & Installation Portal**: `https://volt-ai-lmgz.onrender.com/docs` (or `/install`)
 - **Google Sign-In & Login Portal**: `https://volt-ai-lmgz.onrender.com/login`

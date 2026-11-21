@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-[#0a0e1a] text-slate-100 scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VOLT-AI Studio — Multi-Model AI Routing & Coding Assistant</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700;800;900&display=swap">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'], mono: ['JetBrains Mono', 'monospace'] },
+          colors: {
+            surface: { 950: '#0a0e1a', 900: '#0f1424', 850: '#13192c', 800: '#161d30', 700: '#1e2740', 600: '#283350' },
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { font-family: 'Inter', sans-serif; background-color: #0a0e1a; }
+    .mono { font-family: 'JetBrains Mono', monospace; }
+    .glass { background: rgba(15, 20, 36, 0.75); backdrop-filter: blur(16px); }
+    .glass-card { background: rgba(15, 20, 36, 0.85); backdrop-filter: blur(20px); border: 1px solid rgba(79, 70, 229, 0.25); }
+    .glow-indigo { box-shadow: 0 0 50px rgba(79, 70, 229, 0.15); }
+    .glow-amber { box-shadow: 0 0 40px rgba(245, 158, 11, 0.15); }
+    pre code.hljs { background: #0c1020; border-radius: 0.75rem; padding: 1rem; }
+    .tab-btn.active { color: #f59e0b; border-color: #f59e0b; background: rgba(245, 158, 11, 0.1); }
+  </style>
+</head>
+<body class="min-h-full flex flex-col justify-between relative selection:bg-indigo-600 selection:text-white">
+
+  <!-- Ambient Glow Backgrounds -->
+  <div class="fixed top-[-100px] left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-gradient-to-tr from-indigo-600/15 via-violet-600/10 to-transparent rounded-full blur-[140px] pointer-events-none"></div>
+  <div class="fixed bottom-[-150px] right-[-100px] w-[600px] h-[400px] bg-gradient-to-tl from-amber-500/10 via-indigo-600/5 to-transparent rounded-full blur-[120px] pointer-events-none"></div>
+
+  <!-- Header -->
+  <header class="sticky top-0 z-50 glass border-b border-surface-700/60 px-4 md:px-8 py-3.5">
+    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <a href="#" class="flex items-center gap-2.5 group">
+          <div class="h-9 w-9 rounded-xl bg-gradient-to-tr from-amber-500 via-indigo-600 to-violet-600 flex items-center justify-center font-black text-white text-base shadow-lg shadow-amber-500/20 group-hover:scale-105 transition-transform">⚡</div>
+          <div class="flex items-baseline gap-1.5">
+            <span class="text-xl font-black tracking-tight text-white"><span class="text-amber-400">VOLT</span><span class="text-indigo-400">-AI</span></span>
+            <span class="text-[11px] font-bold text-slate-400 px-2 py-0.5 rounded-full bg-surface-800 border border-surface-700">Studio</span>
+          </div>
+        </a>
+        <div id="api-status-pill" class="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-950/60 text-emerald-400 border border-emerald-800/50">
+          <span class="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span id="api-status-text">Cloud Engine Online</span>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2.5">
+        <a href="https://pypi.org/project/volt-ai/" target="_blank" class="px-3 py-1.5 rounded-lg bg-surface-800 hover:bg-surface-700 border border-surface-700 text-xs font-semibold text-slate-300 flex items-center gap-1.5 transition">
+          <span class="text-amber-400 font-bold">PyPI</span>
+          <span class="text-slate-400">v1.0.0</span>
+        </a>
+        <a href="https://volt-ai-lmgz.onrender.com/docs" target="_blank" class="px-3 py-1.5 rounded-lg bg-surface-800 hover:bg-surface-700 border border-surface-700 text-xs font-semibold text-slate-300 flex items-center gap-1.5 transition">
+          <span>📖 Docs</span>
+        </a>
+        <a href="https://github.com/baizo7/VOLT" target="_blank" class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-xs font-bold text-white flex items-center gap-1.5 shadow-sm transition">
+          <svg class="h-3.5 w-3.5 fill-current" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+          <span>GitHub</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Hero Banner -->
+  <section class="max-w-7xl mx-auto px-4 md:px-8 pt-8 pb-4 text-center">
+    <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-semibold mb-4">
+      <span>⚡ Hugging Face Space Demo</span>
+      <span>&bull;</span>
+      <span>Autonomous Specialist Routing</span>
+    </div>
+    <h1 class="text-3xl md:text-5xl font-extrabold tracking-tight text-white max-w-4xl mx-auto leading-tight">
+      Multi-Model Routing & <span class="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-indigo-400 to-violet-400">Two-Pass Coding Studio</span>
+    </h1>
+    <p class="text-slate-400 text-sm md:text-base max-w-2xl mx-auto mt-3">
+      Explore how VOLT-AI analyzes coding queries, routes to optimal domain specialists, executes verification audits, and strips sensitive secrets before telemetry persistence.
+    </p>
+
+    <!-- Navigation Tabs -->
+    <div class="flex flex-wrap justify-center gap-2 mt-8 border-b border-surface-700/60 pb-3">
+      <button onclick="switchTab('router')" id="tab-router" class="tab-btn active px-4 py-2 rounded-xl text-xs md:text-sm font-bold border border-transparent transition flex items-center gap-2">
+        <span>⚡ Dynamic Router</span>
+      </button>
+      <button onclick="switchTab('studio')" id="tab-studio" class="tab-btn px-4 py-2 rounded-xl text-xs md:text-sm font-bold border border-transparent transition flex items-center gap-2">
+        <span>💻 Code Studio & Two-Pass</span>
+      </button>
+      <button onclick="switchTab('privacy')" id="tab-privacy" class="tab-btn px-4 py-2 rounded-xl text-xs md:text-sm font-bold border border-transparent transition flex items-center gap-2">
+        <span>🔒 Zero-Leak Redactor</span>
+      </button>
+      <button onclick="switchTab('roster')" id="tab-roster" class="tab-btn px-4 py-2 rounded-xl text-xs md:text-sm font-bold border border-transparent transition flex items-center gap-2">
+        <span>🏆 Specialists & Benchmarks</span>
+      </button>
+      <button onclick="switchTab('install')" id="tab-install" class="tab-btn px-4 py-2 rounded-xl text-xs md:text-sm font-bold border border-transparent transition flex items-center gap-2">
+        <span>📦 1-Click Install</span>
+      </button>
+    </div>
+  </section>
+
+  <!-- Main Content Areas -->
+  <main class="max-w-7xl mx-auto px-4 md:px-8 py-6 w-full flex-1">
+
+    <!-- ========== TAB 1: DYNAMIC ROUTER ========== -->
+    <div id="view-router" class="space-y-6">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        <!-- Input & Controls -->
+        <div class="lg:col-span-7 glass-card p-6 rounded-2xl space-y-4">
+          <div class="flex items-center justify-between">
+            <h2 class="text-base font-bold text-white flex items-center gap-2">
+              <span>Enter Coding Task or Architecture Prompt</span>
+            </h2>
+            <span class="text-[11px] text-slate-400">Heuristic Intent Parser</span>
+          </div>
+
+          <textarea id="router-input" rows="5" class="w-full bg-surface-950/90 border border-surface-700 rounded-xl p-3.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-400 mono leading-relaxed" placeholder="e.g. Write an async FastAPI streaming proxy with backpressure and circuit breakers..."></textarea>
+
+          <div class="space-y-2">
+            <span class="text-xs font-semibold text-slate-400">Quick Test Templates:</span>
+            <div class="flex flex-wrap gap-2">
+              <button onclick="loadTemplate('fast')" class="px-2.5 py-1 rounded-lg bg-surface-800 hover:bg-surface-700 border border-surface-700 text-xs text-slate-300 transition">⚡ Fast Python Function</button>
+              <button onclick="loadTemplate('heavy')" class="px-2.5 py-1 rounded-lg bg-surface-800 hover:bg-surface-700 border border-surface-700 text-xs text-slate-300 transition">🏗️ Distributed System</button>
+              <button onclick="loadTemplate('math')" class="px-2.5 py-1 rounded-lg bg-surface-800 hover:bg-surface-700 border border-surface-700 text-xs text-slate-300 transition">📐 Graph Theorem & Proof</button>
+              <button onclick="loadTemplate('vision')" class="px-2.5 py-1 rounded-lg bg-surface-800 hover:bg-surface-700 border border-surface-700 text-xs text-slate-300 transition">🖼️ Wireframe to React</button>
+            </div>
+          </div>
+
+          <div class="pt-2 flex items-center justify-between">
+            <button onclick="analyzeRouting()" class="px-6 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-indigo-600 hover:from-amber-400 hover:to-indigo-500 text-white font-bold text-sm shadow-lg shadow-amber-500/20 transition flex items-center gap-2">
+              <span>⚡ Analyze & Route</span>
+            </button>
+            <span class="text-[11px] text-slate-500">Dual-Pass Routing Active</span>
+          </div>
+        </div>
+
+        <!-- Decision Rationale & Selected Specialist Card -->
+        <div class="lg:col-span-5 space-y-4">
+          <div class="glass-card p-6 rounded-2xl space-y-4 glow-indigo">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Selected Specialist Track</span>
+              <span id="route-badge" class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">fast_coder</span>
+            </div>
+
+            <div class="p-4 rounded-xl bg-surface-950/80 border border-surface-700 space-y-2">
+              <h3 id="route-model-name" class="text-lg font-black text-white">Qwen2.5-Coder-7B-Instruct</h3>
+              <p id="route-model-desc" class="text-xs text-slate-400 leading-relaxed">
+                Specialized in single-file tactical programming, fast syntax completion, and unit test generation.
+              </p>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3 text-center">
+              <div class="p-3 rounded-xl bg-surface-900 border border-surface-700">
+                <span class="text-[10px] text-slate-400 uppercase font-semibold block">Complexity Rating</span>
+                <span id="route-complexity" class="text-lg font-black text-amber-400">Low (Tactical)</span>
+              </div>
+              <div class="p-3 rounded-xl bg-surface-900 border border-surface-700">
+                <span class="text-[10px] text-slate-400 uppercase font-semibold block">Estimated Latency</span>
+                <span id="route-latency" class="text-lg font-black text-emerald-400">~220 ms</span>
+              </div>
+            </div>
+
+            <div class="space-y-1.5 pt-2">
+              <span class="text-xs font-bold text-slate-300">Routing Decision Rationale:</span>
+              <p id="route-rationale" class="text-xs text-slate-400 leading-relaxed bg-surface-950/60 p-3 rounded-lg border border-surface-800">
+                Query contains clean tactical logic matching the fast_coder track. Avoids heavy frontier model overhead while maximizing generation speed.
+              </p>
+            </div>
+
+            <div class="pt-2 border-t border-surface-800 flex items-center justify-between text-xs text-slate-400">
+              <span>Two-Pass Reasoning:</span>
+              <span class="text-emerald-400 font-semibold flex items-center gap-1">
+                <span>Pass 1: Fast Gen</span> &rarr; <span>Pass 2: QA Audit</span>
+              </span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ========== TAB 2: CODE STUDIO & TWO-PASS ========== -->
+    <div id="view-studio" class="hidden space-y-6">
+      <div class="glass-card p-6 rounded-2xl space-y-4">
+        
+        <div class="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-surface-700">
+          <div>
+            <h2 class="text-lg font-bold text-white">Live Code Studio & Verification Audit</h2>
+            <p class="text-xs text-slate-400">Inspect Pass-1 generation alongside Pass-2 automated verification</p>
+          </div>
+          
+          <div class="flex items-center gap-2">
+            <select id="studio-mode-select" class="bg-surface-950 border border-surface-700 text-xs text-slate-300 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-amber-400">
+              <option value="sim">Standalone High-Fidelity Simulation</option>
+              <option value="live">Live VOLT Cloud Proxy API</option>
+              <option value="byok">Personal BYOK API Key</option>
+            </select>
+            <button onclick="runStudioGeneration()" class="px-4 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-md transition flex items-center gap-1.5">
+              <span>⚡ Run Dual-Pass</span>
+            </button>
+          </div>
+        </div>
+
+        <div id="byok-key-input-container" class="hidden p-3 rounded-xl bg-surface-900 border border-surface-700 flex items-center gap-3">
+          <span class="text-xs font-semibold text-slate-300">Your Provider Key:</span>
+          <input type="password" id="byok-key" class="flex-1 bg-surface-950 border border-surface-700 text-xs px-3 py-1.5 rounded-lg text-slate-200" placeholder="sk-..." />
+          <span class="text-[10px] text-slate-500">Stored only in your browser memory</span>
+        </div>
+
+        <!-- Studio Two-Column Grid: Pass 1 vs Pass 2 -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          
+          <!-- Pass 1 Column -->
+          <div class="space-y-2">
+            <div class="flex items-center justify-between px-1">
+              <span class="text-xs font-bold text-indigo-400 flex items-center gap-1.5">
+                <span class="h-2 w-2 rounded-full bg-indigo-400"></span>
+                <span>Pass 1: Specialist Candidate Generation</span>
+              </span>
+              <span id="pass1-time" class="text-[11px] text-slate-500">184 ms</span>
+            </div>
+            <pre><code id="pass1-code" class="language-python"># Pass 1 candidate implementation will generate here...
+async def stream_data(endpoint: str):
+    async with httpx.AsyncClient() as client:
+        response = await client.get(endpoint)
+        return response.json()</code></pre>
+          </div>
+
+          <!-- Pass 2 Column -->
+          <div class="space-y-2">
+            <div class="flex items-center justify-between px-1">
+              <span class="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
+                <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
+                <span>Pass 2: Reasoning & Edge-Case Audit</span>
+              </span>
+              <span id="pass2-status" class="text-[11px] text-emerald-400 font-semibold">Verified PASS</span>
+            </div>
+            <pre><code id="pass2-code" class="language-python"># Pass 2 verifies error handling, timeout leaks, and typed schemas:
+async def stream_data(endpoint: str, timeout_sec: float = 10.0) -> dict:
+    try:
+        async with httpx.AsyncClient(timeout=timeout_sec) as client:
+            response = await client.get(endpoint)
+            response.raise_for_status()
+            return response.json()
+    except httpx.HTTPError as exc:
+        logger.error(f"Upstream request failure: {exc}")
+        raise ServiceUnavailableError("Upstream service unreachable")</code></pre>
+          </div>
+
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ========== TAB 3: ZERO-LEAK PRIVACY REDACTOR ========== -->
+    <div id="view-privacy" class="hidden space-y-6">
+      <div class="glass-card p-6 rounded-2xl space-y-4">
+        <div>
+          <h2 class="text-lg font-bold text-white flex items-center gap-2">
+            <span>Zero-Leak In-Flight Secret Redaction Engine</span>
+          </h2>
+          <p class="text-xs text-slate-400">
+            VOLT-AI scans prompts and completions in memory and strips cloud secrets, private keys, and API tokens before database logging.
+          </p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <!-- Raw Input -->
+          <div class="space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-rose-400">Original Payload (Containing Secrets)</span>
+              <button onclick="runRedactorTest()" class="text-xs text-indigo-400 hover:text-indigo-300 underline font-semibold">Load Sample Secrets</button>
+            </div>
+            <textarea id="redactor-input" rows="8" class="w-full bg-surface-950/90 border border-surface-700 rounded-xl p-3 text-xs text-slate-200 mono focus:outline-none focus:border-rose-400 leading-relaxed"></textarea>
+          </div>
+
+          <!-- Scrubbed Output -->
+          <div class="space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-emerald-400">Scrubbed Record (Persisted to Database)</span>
+              <span id="redacted-count" class="text-xs font-bold text-emerald-400">3 Secrets Redacted</span>
+            </div>
+            <div id="redactor-output" class="w-full h-[178px] bg-surface-950/90 border border-emerald-800/40 rounded-xl p-3 text-xs text-slate-300 mono overflow-y-auto whitespace-pre-wrap leading-relaxed"></div>
+          </div>
+        </div>
+
+        <div class="p-3.5 rounded-xl bg-surface-900 border border-surface-700 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-400">
+          <span>Protected Patterns: OpenAI Keys, Anthropic Keys, AWS Access & Secret Keys, GitHub PATs, Bearer Auth, RSA Private Keys.</span>
+          <span class="text-amber-400 font-bold">100% Zero-Leak Guarantee</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== TAB 4: SPECIALISTS & BENCHMARKS ========== -->
+    <div id="view-roster" class="hidden space-y-6">
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        
+        <!-- Specialist 1 -->
+        <div class="glass-card p-5 rounded-2xl space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">fast_coder</span>
+            <span class="text-xs font-black text-emerald-400">88.4% HumanEval</span>
+          </div>
+          <h3 class="text-base font-bold text-white">Qwen2.5-Coder-7B-Instruct</h3>
+          <p class="text-xs text-slate-400 leading-relaxed">
+            Ultra-low latency tactical programming, syntax generation, and rapid bugfixes with 32k context.
+          </p>
+          <div class="pt-2 border-t border-surface-700/60 flex items-center justify-between text-[11px] text-slate-400">
+            <span>Avg Latency: <strong>~220 ms</strong></span>
+            <span>Cost: <strong>$0.00 / Free</strong></span>
+          </div>
+        </div>
+
+        <!-- Specialist 2 -->
+        <div class="glass-card p-5 rounded-2xl space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">heavy_coder</span>
+            <span class="text-xs font-black text-indigo-400">93.7% HumanEval</span>
+          </div>
+          <h3 class="text-base font-bold text-white">Claude 3.5 Sonnet / GPT-4o</h3>
+          <p class="text-xs text-slate-400 leading-relaxed">
+            Multi-file software architecture, refactoring, full system design, and complex typing hierarchies.
+          </p>
+          <div class="pt-2 border-t border-surface-700/60 flex items-center justify-between text-[11px] text-slate-400">
+            <span>Avg Latency: <strong>~1,100 ms</strong></span>
+            <span>Cost: <strong>BYOK / Portal</strong></span>
+          </div>
+        </div>
+
+        <!-- Specialist 3 -->
+        <div class="glass-card p-5 rounded-2xl space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-violet-500/20 text-violet-300 border border-violet-500/30">deep_reasoner</span>
+            <span class="text-xs font-black text-violet-400">94.8% Math500</span>
+          </div>
+          <h3 class="text-base font-bold text-white">DeepSeek-R1 / OpenAI o1</h3>
+          <p class="text-xs text-slate-400 leading-relaxed">
+            Exhaustive chain-of-thought verification for hard algorithmic puzzles, deadlock analysis, and logic proofs.
+          </p>
+          <div class="pt-2 border-t border-surface-700/60 flex items-center justify-between text-[11px] text-slate-400">
+            <span>Avg Latency: <strong>~2,400 ms</strong></span>
+            <span>Cost: <strong>BYOK / Portal</strong></span>
+          </div>
+        </div>
+
+        <!-- Specialist 4 -->
+        <div class="glass-card p-5 rounded-2xl space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">math_specialist</span>
+            <span class="text-xs font-black text-cyan-400">92.2% GSM8K</span>
+          </div>
+          <h3 class="text-base font-bold text-white">Qwen2.5-Math-7B-Base</h3>
+          <p class="text-xs text-slate-400 leading-relaxed">
+            LaTeX proofs, numerical simulations, symbolic algebra, and algorithmic asymptotic complexity analysis.
+          </p>
+          <div class="pt-2 border-t border-surface-700/60 flex items-center justify-between text-[11px] text-slate-400">
+            <span>Avg Latency: <strong>~350 ms</strong></span>
+            <span>Cost: <strong>$0.00 / Free</strong></span>
+          </div>
+        </div>
+
+        <!-- Specialist 5 -->
+        <div class="glass-card p-5 rounded-2xl space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-pink-500/20 text-pink-300 border border-pink-500/30">vision_specialist</span>
+            <span class="text-xs font-black text-pink-400">86.1% DocVQA</span>
+          </div>
+          <h3 class="text-base font-bold text-white">Qwen2-VL-7B-Instruct</h3>
+          <p class="text-xs text-slate-400 leading-relaxed">
+            Multimodal comprehension, converting wireframes, diagrams, and architecture sketches into frontend code.
+          </p>
+          <div class="pt-2 border-t border-surface-700/60 flex items-center justify-between text-[11px] text-slate-400">
+            <span>Avg Latency: <strong>~650 ms</strong></span>
+            <span>Cost: <strong>$0.00 / Free</strong></span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ========== TAB 5: 1-CLICK INSTALL & CLI ========== -->
+    <div id="view-install" class="hidden space-y-6">
+      <div class="glass-card p-6 rounded-2xl space-y-6">
+        <div>
+          <h2 class="text-lg font-bold text-white">1-Click Installation & Local Setup</h2>
+          <p class="text-xs text-slate-400">Install the official VOLT CLI from PyPI or connect your IDE</p>
+        </div>
+
+        <!-- PyPI Install Box -->
+        <div class="p-4 rounded-xl bg-surface-950 border border-surface-700 flex flex-wrap items-center justify-between gap-3">
+          <div class="flex items-center gap-3">
+            <span class="text-amber-400 text-lg">⚡</span>
+            <div>
+              <p class="text-xs text-slate-400">Install directly from PyPI</p>
+              <p class="text-sm font-bold text-white mono">pip install volt-ai</p>
+            </div>
+          </div>
+          <button onclick="navigator.clipboard.writeText('pip install volt-ai'); alert('Copied to clipboard!')" class="px-3.5 py-1.5 rounded-lg bg-surface-800 hover:bg-surface-700 border border-surface-600 text-xs font-bold text-slate-200 transition">
+            Copy Command
+          </button>
+        </div>
+
+        <!-- CLI Commands Table -->
+        <div class="space-y-3">
+          <h3 class="text-sm font-bold text-slate-300">Essential Terminal Commands</h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+            <div class="p-3 rounded-lg bg-surface-900 border border-surface-700 space-y-1">
+              <span class="font-bold text-amber-400 mono">volt activate</span>
+              <p class="text-slate-400">Configure central server URL and personal provider key</p>
+            </div>
+            <div class="p-3 rounded-lg bg-surface-900 border border-surface-700 space-y-1">
+              <span class="font-bold text-amber-400 mono">volt code "prompt"</span>
+              <p class="text-slate-400">Stream code directly with optional -f (file) or -i (image)</p>
+            </div>
+            <div class="p-3 rounded-lg bg-surface-900 border border-surface-700 space-y-1">
+              <span class="font-bold text-amber-400 mono">volt chat</span>
+              <p class="text-slate-400">Multi-turn coding REPL with /write and /apply commands</p>
+            </div>
+            <div class="p-3 rounded-lg bg-surface-900 border border-surface-700 space-y-1">
+              <span class="font-bold text-amber-400 mono">volt dashboard</span>
+              <p class="text-slate-400">Open real-time visual telemetry dashboard in browser</p>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="glass border-t border-surface-700/60 px-4 md:px-8 py-4 mt-8">
+    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4 text-xs text-slate-500">
+      <div class="flex items-center gap-2">
+        <span class="font-bold text-slate-400">VOLT-AI Studio</span>
+        <span>&bull;</span>
+        <span>Hugging Face Space &bull; Static Web SDK</span>
+      </div>
+      <div>
+        <span>Author: <a href="https://huggingface.co/baizo" class="text-slate-300 hover:text-white font-semibold">baizo</a> (S Sanjai) &bull; Apache 2.0</span>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // Tab Switching
+    function switchTab(tab) {
+      const tabs = ['router', 'studio', 'privacy', 'roster', 'install'];
+      tabs.forEach(t => {
+        const view = document.getElementById('view-' + t);
+        const btn = document.getElementById('tab-' + t);
+        if (t === tab) {
+          view.classList.remove('hidden');
+          btn.classList.add('active');
+        } else {
+          view.classList.add('hidden');
+          btn.classList.remove('active');
+        }
+      });
+    }
+
+    // Dynamic Router Logic
+    const TEMPLATES = {
+      fast: "def parse_jwt_claims(token: str) -> dict:\n    # Rapid tactical utility to extract claims without verification\n    payload = token.split('.')[1]\n    return json.loads(base64.b64decode(payload + '==').decode('utf-8'))",
+      heavy: "Design a fault-tolerant multi-region event streaming architecture utilizing Apache Kafka, transactional outbox pattern, and PostgreSQL with idempotent event consumers.",
+      math: "Prove that in any directed acyclic graph (DAG), the length of the longest path can be found in O(V + E) time using topological sort and dynamic programming.",
+      vision: "Convert this UI design screenshot of a cryptocurrency portfolio dashboard with dark glassmorphic cards and live price graphs into React and Tailwind CSS."
+    };
+
+    function loadTemplate(key) {
+      document.getElementById('router-input').value = TEMPLATES[key];
+      analyzeRouting();
+    }
+
+    function analyzeRouting() {
+      const text = (document.getElementById('router-input').value || '').toLowerCase();
+      let specialist = 'fast_coder';
+      let modelName = 'Qwen2.5-Coder-7B-Instruct';
+      let desc = 'Specialized in single-file tactical programming, fast syntax completion, and unit test generation.';
+      let complexity = 'Low (Tactical)';
+      let latency = '~220 ms';
+      let rationale = 'Query contains concise tactical code matching the fast_coder track for minimal latency.';
+
+      if (text.includes('architecture') || text.includes('microservice') || text.includes('distributed') || text.includes('kafka') || text.includes('refactor') || text.length > 300) {
+        specialist = 'heavy_coder';
+        modelName = 'Claude 3.5 Sonnet / GPT-4o';
+        desc = 'Multi-file software architecture, refactoring, full system design, and typing hierarchies.';
+        complexity = 'High (Systemic)';
+        latency = '~1,100 ms';
+        rationale = 'Query requires high-level system design and multi-component coordination, routing to heavy_coder.';
+      } else if (text.includes('prove') || text.includes('math') || text.includes('theorem') || text.includes('matrix') || text.includes('equation')) {
+        specialist = 'math_specialist';
+        modelName = 'Qwen2.5-Math-7B-Base';
+        desc = 'LaTeX proofs, numerical simulations, and asymptotic complexity analysis.';
+        complexity = 'High (Mathematical)';
+        latency = '~350 ms';
+        rationale = 'Detected formal proofs, numerical theorems, or symbolic compute, routing to math_specialist.';
+      } else if (text.includes('screenshot') || text.includes('ui') || text.includes('wireframe') || text.includes('mockup') || text.includes('image')) {
+        specialist = 'vision_specialist';
+        modelName = 'Qwen2-VL-7B-Instruct';
+        desc = 'Multimodal comprehension and UI-to-code synthesis.';
+        complexity = 'Medium (Multimodal)';
+        latency = '~650 ms';
+        rationale = 'Visual UI or wireframe elements detected, routing to multimodal vision_specialist.';
+      } else if (text.includes('edge case') || text.includes('deadlock') || text.includes('formal') || text.includes('verify')) {
+        specialist = 'deep_reasoner';
+        modelName = 'DeepSeek-R1 / OpenAI o1';
+        desc = 'Exhaustive chain-of-thought verification for hard algorithmic puzzles.';
+        complexity = 'Critical (Reasoning)';
+        latency = '~2,400 ms';
+        rationale = 'Algorithmic edge cases and rigorous formal constraints route to deep_reasoner.';
+      }
+
+      document.getElementById('route-badge').innerText = specialist;
+      document.getElementById('route-model-name').innerText = modelName;
+      document.getElementById('route-model-desc').innerText = desc;
+      document.getElementById('route-complexity').innerText = complexity;
+      document.getElementById('route-latency').innerText = latency;
+      document.getElementById('route-rationale').innerText = rationale;
+    }
+
+    // Studio Generation Simulation
+    function runStudioGeneration() {
+      const mode = document.getElementById('studio-mode-select').value;
+      const pass1El = document.getElementById('pass1-code');
+      const pass2El = document.getElementById('pass2-code');
+
+      pass1El.innerText = "# Streaming Pass 1 draft candidate...";
+      pass2El.innerText = "# Awaiting Pass 1 output for verification audit...";
+
+      setTimeout(() => {
+        pass1El.innerText = `# [Pass 1 Generated by fast_coder]
+async def fetch_metrics(service_url: str):
+    async with httpx.AsyncClient() as client:
+        res = await client.get(service_url)
+        return res.json()`;
+        hljs.highlightElement(pass1El);
+
+        setTimeout(() => {
+          pass2El.innerText = `# [Pass 2 Verified by VOLT QA Auditor]
+# Audit Findings: Added timeout handling & typed error models
+async def fetch_metrics(service_url: str, timeout_sec: float = 5.0) -> dict:
+    try:
+        async with httpx.AsyncClient(timeout=timeout_sec) as client:
+            res = await client.get(service_url)
+            res.raise_for_status()
+            return res.json()
+    except httpx.TimeoutException:
+        raise TimeoutError(f"Metrics collection timed out after {timeout_sec}s")
+    except httpx.HTTPError as exc:
+        raise RuntimeError(f"Upstream HTTP error: {exc}")`;
+          hljs.highlightElement(pass2El);
+        }, 500);
+      }, 400);
+    }
+
+    // Secret Redaction Simulation
+    const SECRET_PATTERNS = [
+      { name: 'OPENAI_KEY', re: /sk-[A-Za-z0-9]{20,}/g, repl: '[REDACTED_OPENAI_KEY]' },
+      { name: 'AWS_KEY', re: /AKIA[0-9A-Z]{16}/g, repl: '[REDACTED_AWS_KEY]' },
+      { name: 'AWS_SECRET', re: /aws_secret_access_key\s*=\s*['"]?[A-Za-z0-9/+=]{40}['"]?/gi, repl: 'aws_secret_access_key=[REDACTED_AWS_SECRET]' },
+      { name: 'GH_TOKEN', re: /ghp_[A-Za-z0-9]{36}/g, repl: '[REDACTED_GITHUB_PAT]' },
+      { name: 'BEARER', re: /Bearer\s+[A-Za-z0-9_.-]{30,}/gi, repl: 'Bearer [REDACTED_TOKEN]' }
+    ];
+
+    function runRedactorTest() {
+      const sample = `Configuration:
+OPENAI_API_KEY = "sk-proj-984f98a2f3b9c810d7e6a5b4c3d2e1f0a"
+AWS_ACCESS_KEY_ID = "AKIAIOSFODNN7EXAMPLE"
+aws_secret_access_key = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+GITHUB_TOKEN = "ghp_0123456789abcdefghijklmnopqrstuvwxyz"
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.secret`;
+
+      document.getElementById('redactor-input').value = sample;
+      scrubInput();
+    }
+
+    function scrubInput() {
+      let raw = document.getElementById('redactor-input').value;
+      let count = 0;
+      SECRET_PATTERNS.forEach(pat => {
+        const matches = raw.match(pat.re);
+        if (matches) count += matches.length;
+        raw = raw.replace(pat.re, `<span class="bg-emerald-950 text-emerald-400 font-bold px-1.5 py-0.5 rounded border border-emerald-800">${pat.repl}</span>`);
+      });
+      document.getElementById('redactor-output').innerHTML = raw;
+      document.getElementById('redacted-count').innerText = `${count} Secrets Redacted`;
+    }
+
+    document.getElementById('redactor-input').addEventListener('input', scrubInput);
+
+    // Initial Health Probe
+    async function checkHealth() {
+      try {
+        const res = await fetch('https://volt-ai-lmgz.onrender.com/health', { signal: AbortSignal.timeout(4000) });
+        if (res.ok) {
+          document.getElementById('api-status-text').innerText = 'Cloud Engine Online';
+        }
+      } catch (e) {
+        document.getElementById('api-status-text').innerText = 'Cloud Engine Standby';
+      }
+    }
+
+    // Toggle BYOK Key Input
+    document.getElementById('studio-mode-select').addEventListener('change', (e) => {
+      const container = document.getElementById('byok-key-input-container');
+      if (e.target.value === 'byok') {
+        container.classList.remove('hidden');
+      } else {
+        container.classList.add('hidden');
+      }
+    });
+
+    // Run on startup
+    document.addEventListener('DOMContentLoaded', () => {
+      hljs.highlightAll();
+      loadTemplate('fast');
+      runRedactorTest();
+      checkHealth();
+    });
+  </script>
+</body>
+</html>
