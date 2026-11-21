@@ -38,4 +38,4 @@ If the deployment requires a shared `OBSERVER_AUTH_TOKEN` or enforces `REQUIRE_A
 - Source: [GitHub repository](https://github.com/baizo7/VOLT)
 - Model license: Apache 2.0
 - Platform / coordination backend: proprietary and source-available under the repository's license terms.
-- [Architecture](../docs/architecture.md) · [Developer guide](../docs/developer-guide.md) · [Benchmark methodology](../docs/benchmarks.md)
+- [Architecture](https://github.com/baizo7/VOLT/blob/main/docs/architecture.md) · [Developer guide](https://github.com/baizo7/VOLT/blob/main/docs/developer-guide.md) · [Benchmark methodology](https://github.com/baizo7/VOLT/blob/main/docs/benchmarks.md)
