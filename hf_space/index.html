@@ -192,15 +192,15 @@
         
         <div class="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-surface-700">
           <div>
-            <h2 class="text-lg font-bold text-white">Live Code Studio & Verification Audit</h2>
-            <p class="text-xs text-slate-400">Inspect Pass-1 generation alongside Pass-2 automated verification</p>
+            <h2 class="text-lg font-bold text-white">Live VOLT Playground</h2>
+            <p class="text-xs text-slate-400">Send the Router Lab prompt to the real VOLT API, or run the clearly labelled local UI simulation</p>
           </div>
           
           <div class="flex items-center gap-2">
             <select id="studio-mode-select" class="bg-surface-950 border border-surface-700 text-xs text-slate-300 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-amber-400">
-              <option value="sim">Standalone High-Fidelity Simulation</option>
-              <option value="live">Live VOLT Cloud Proxy API</option>
-              <option value="byok">Personal BYOK API Key</option>
+              <option value="live">VOLT API — Free Tier (Live)</option>
+              <option value="byok">VOLT API — Bring Your Own Key (Live)</option>
+              <option value="sim">Local UI Simulation (No API Call)</option>
             </select>
             <button onclick="runStudioGeneration()" class="px-4 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-md transition flex items-center gap-1.5">
               <span>⚡ Run Dual-Pass</span>
@@ -210,8 +210,12 @@
 
         <div id="byok-key-input-container" class="hidden p-3 rounded-xl bg-surface-900 border border-surface-700 flex items-center gap-3">
           <span class="text-xs font-semibold text-slate-300">Your Provider Key:</span>
-          <input type="password" id="byok-key" class="flex-1 bg-surface-950 border border-surface-700 text-xs px-3 py-1.5 rounded-lg text-slate-200" placeholder="sk-..." />
-          <span class="text-[10px] text-slate-500">Stored only in your browser memory</span>
+          <input type="password" id="byok-key" autocomplete="off" class="flex-1 bg-surface-950 border border-surface-700 text-xs px-3 py-1.5 rounded-lg text-slate-200" placeholder="Your provider API key" />
+          <span class="text-[10px] text-slate-500">Used for this request only; not saved by this page</span>
+        </div>
+        <div class="rounded-xl bg-surface-900 border border-surface-700 p-3 flex flex-wrap items-center justify-between gap-2">
+          <p class="text-xs text-slate-400">Prompt source: <strong class="text-slate-200">Router Lab</strong> tab. Run a live request to see actual backend routing and token usage.</p>
+          <button type="button" onclick="switchTab('router')" class="text-xs font-bold text-amber-400 hover:text-amber-300">Open Router Lab →</button>
         </div>
 
         <!-- Studio Two-Column Grid: Pass 1 vs Pass 2 -->
@@ -222,15 +226,11 @@
             <div class="flex items-center justify-between px-1">
               <span class="text-xs font-bold text-indigo-400 flex items-center gap-1.5">
                 <span class="h-2 w-2 rounded-full bg-indigo-400"></span>
-                <span>Pass 1: Specialist Candidate Generation</span>
+                <span>Actual VOLT API Response</span>
               </span>
-              <span id="pass1-time" class="text-[11px] text-slate-500">184 ms</span>
+              <span id="pass1-time" class="text-[11px] text-slate-500">—</span>
             </div>
-            <pre><code id="pass1-code" class="language-python"># Pass 1 candidate implementation will generate here...
-async def stream_data(endpoint: str):
-    async with httpx.AsyncClient() as client:
-        response = await client.get(endpoint)
-        return response.json()</code></pre>
+            <pre><code id="pass1-code" class="language-python">Enter a prompt in the Router Lab tab, then choose a live mode and click Run VOLT.</code></pre>
           </div>
 
           <!-- Pass 2 Column -->
@@ -238,20 +238,11 @@ async def stream_data(endpoint: str):
             <div class="flex items-center justify-between px-1">
               <span class="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
                 <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
-                <span>Pass 2: Reasoning & Edge-Case Audit</span>
+                <span>Backend Routing & Usage Metadata</span>
               </span>
-              <span id="pass2-status" class="text-[11px] text-emerald-400 font-semibold">Verified PASS</span>
+              <span id="pass2-status" class="text-[11px] text-slate-500 font-semibold">Awaiting request</span>
             </div>
-            <pre><code id="pass2-code" class="language-python"># Pass 2 verifies error handling, timeout leaks, and typed schemas:
-async def stream_data(endpoint: str, timeout_sec: float = 10.0) -> dict:
-    try:
-        async with httpx.AsyncClient(timeout=timeout_sec) as client:
-            response = await client.get(endpoint)
-            response.raise_for_status()
-            return response.json()
-    except httpx.HTTPError as exc:
-        logger.error(f"Upstream request failure: {exc}")
-        raise ServiceUnavailableError("Upstream service unreachable")</code></pre>
+            <pre><code id="pass2-code" class="language-python">Actual track, specialist identifiers, routing reason, measured latency and API token usage will appear here after a live request.</code></pre>
           </div>
 
         </div>
@@ -527,38 +518,120 @@ async def stream_data(endpoint: str, timeout_sec: float = 10.0) -> dict:
     }
 
     // Studio Generation Simulation
-    function runStudioGeneration() {
+    async function runStudioGeneration() {
       const mode = document.getElementById('studio-mode-select').value;
       const pass1El = document.getElementById('pass1-code');
       const pass2El = document.getElementById('pass2-code');
+      const elapsedEl = document.getElementById('pass1-time');
+      const statusEl = document.getElementById('pass2-status');
+      const button = document.querySelector('button[onclick="runStudioGeneration()"]');
+      const prompt = (document.getElementById('router-input')?.value || '').trim();
 
-      pass1El.innerText = "# Streaming Pass 1 draft candidate...";
-      pass2El.innerText = "# Awaiting Pass 1 output for verification audit...";
+      if (!prompt) {
+        pass1El.textContent = 'Add a prompt in the Router Lab tab before running VOLT.';
+        pass2El.textContent = 'No request has been sent.';
+        switchTab('router');
+        return;
+      }
 
-      setTimeout(() => {
-        pass1El.innerText = `# [Pass 1 Generated by fast_coder]
-async def fetch_metrics(service_url: str):
-    async with httpx.AsyncClient() as client:
-        res = await client.get(service_url)
-        return res.json()`;
-        hljs.highlightElement(pass1El);
+      if (mode === 'sim') {
+        statusEl.textContent = 'Local simulation';
+        statusEl.className = 'text-[11px] text-amber-400 font-semibold';
+        elapsedEl.textContent = 'Not measured';
+        pass1El.textContent = '# LOCAL UI SIMULATION ONLY\n# No model API was called.\n\nThis mode is a visual demonstration, not a generated VOLT response.';
+        pass2El.textContent = JSON.stringify({
+          mode: 'simulation',
+          live_request: false,
+          note: 'Choose one of the live API modes to invoke the deployed VOLT backend.'
+        }, null, 2);
+        return;
+      }
 
-        setTimeout(() => {
-          pass2El.innerText = `# [Pass 2 Verified by VOLT QA Auditor]
-# Audit Findings: Added timeout handling & typed error models
-async def fetch_metrics(service_url: str, timeout_sec: float = 5.0) -> dict:
-    try:
-        async with httpx.AsyncClient(timeout=timeout_sec) as client:
-            res = await client.get(service_url)
-            res.raise_for_status()
-            return res.json()
-    except httpx.TimeoutException:
-        raise TimeoutError(f"Metrics collection timed out after {timeout_sec}s")
-    except httpx.HTTPError as exc:
-        raise RuntimeError(f"Upstream HTTP error: {exc}")`;
-          hljs.highlightElement(pass2El);
-        }, 500);
-      }, 400);
+      const apiUrl = 'https://volt-ai-lmgz.onrender.com/v1/chat/completions';
+      const headers = { 'Content-Type': 'application/json' };
+      if (mode === 'byok') {
+        const key = (document.getElementById('byok-key')?.value || '').trim();
+        if (!key) {
+          statusEl.textContent = 'API key required';
+          statusEl.className = 'text-[11px] text-rose-400 font-semibold';
+          pass1El.textContent = 'Enter your provider API key in the BYOK field.';
+          return;
+        }
+        headers.Authorization = 'Bearer ' + key;
+      }
+
+      const originalLabel = button ? button.textContent : '';
+      if (button) {
+        button.disabled = true;
+        button.textContent = 'Calling VOLT…';
+        button.classList.add('opacity-60', 'cursor-not-allowed');
+      }
+      statusEl.textContent = 'Request in progress';
+      statusEl.className = 'text-[11px] text-amber-400 font-semibold';
+      pass1El.textContent = 'Sending prompt to the deployed VOLT API…';
+      pass2El.textContent = 'Waiting for routing and token metadata…';
+      elapsedEl.textContent = 'Measuring…';
+
+      const started = performance.now();
+      try {
+        const response = await fetch(apiUrl, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            model: 'VOLT-AI',
+            messages: [{ role: 'user', content: prompt }],
+            stream: false
+          }),
+          signal: AbortSignal.timeout(180000)
+        });
+        const clientLatencyMs = Math.round(performance.now() - started);
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          const detail = payload?.error?.message || payload?.error || payload?.detail || response.statusText;
+          throw new Error('VOLT API ' + response.status + ': ' + String(detail));
+        }
+
+        const answer = payload?.choices?.[0]?.message?.content;
+        if (typeof answer !== 'string' || !answer.trim()) {
+          throw new Error('The API returned no assistant message.');
+        }
+        const coordination = payload.volt_coordination || payload.observer_coordination || {};
+        const usage = payload.usage || {};
+        pass1El.textContent = answer;
+        pass2El.textContent = JSON.stringify({
+          live_request: true,
+          model: payload.model || 'VOLT-AI',
+          track: coordination.track ?? null,
+          specialists_used: coordination.specialists_used ?? [],
+          routing_reason: coordination.reason ?? null,
+          has_reasoning_pass: coordination.has_reasoning_pass ?? null,
+          server_latency_ms: coordination.latency_ms ?? null,
+          client_observed_latency_ms: clientLatencyMs,
+          prompt_tokens: usage.prompt_tokens ?? null,
+          completion_tokens: usage.completion_tokens ?? null,
+          total_tokens: usage.total_tokens ?? null
+        }, null, 2);
+        elapsedEl.textContent = clientLatencyMs + ' ms client-observed';
+        statusEl.textContent = 'Live response received';
+        statusEl.className = 'text-[11px] text-emerald-400 font-semibold';
+      } catch (error) {
+        const message = error?.name === 'TimeoutError'
+          ? 'Request timed out after 180 seconds.'
+          : (error?.message || 'Unable to reach VOLT API.');
+        pass1El.textContent = 'Request failed: ' + message;
+        pass2El.textContent = 'No successful response metadata is available.';
+        elapsedEl.textContent = 'Failed';
+        statusEl.textContent = 'Request failed';
+        statusEl.className = 'text-[11px] text-rose-400 font-semibold';
+      } finally {
+        if (button) {
+          button.disabled = false;
+          button.textContent = originalLabel || '⚡ Run VOLT';
+          button.classList.remove('opacity-60', 'cursor-not-allowed');
+        }
+        const byokInput = document.getElementById('byok-key');
+        if (byokInput && mode === 'byok') byokInput.value = '';
+      }
     }
 
     // Secret Redaction Simulation
