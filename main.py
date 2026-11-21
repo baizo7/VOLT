@@ -1108,6 +1108,8 @@ async def stats(request: Request, session_id: Optional[str] = None, project: Opt
                    COALESCE(o.passes, 0) AS passes, COALESCE(o.fails, 0) AS fails
             FROM (
                 SELECT model, count(*) calls, round(avg(latency_ms)) avg_latency_ms,
+                       percentile_cont(0.50) WITHIN GROUP (ORDER BY latency_ms) AS p50_latency_ms,
+                       percentile_cont(0.95) WITHIN GROUP (ORDER BY latency_ms) AS p95_latency_ms,
                        sum(input_tokens) input_tokens, sum(output_tokens) output_tokens
                 FROM filtered_calls
                 GROUP BY model
