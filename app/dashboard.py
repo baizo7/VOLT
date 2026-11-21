@@ -828,7 +828,7 @@ async function fetchData() {
       renderStats(S.statsCache);
     } else if (sRes.status === 503) {
       const mb = document.getElementById('models-body');
-      if (mb) mb.innerHTML = '<tr><td colspan="8" class="py-6 text-center text-amber-400 text-xs">⚠️ Database is connecting. Run <code class="mono bg-surface-900 px-2 py-0.5 rounded border border-surface-700 text-cyan-300">docker compose up -d db</code> in terminal.</td></tr>';
+      if (mb) mb.innerHTML = '<tr><td colspan="10" class="py-6 text-center text-amber-400 text-xs">⚠️ Database is connecting. Run <code class="mono bg-surface-900 px-2 py-0.5 rounded border border-surface-700 text-cyan-300">docker compose up -d db</code> in terminal.</td></tr>';
     }
     const tRes = await fetch('/tasks'+tq, {headers:h});
     if (tRes.ok) {
